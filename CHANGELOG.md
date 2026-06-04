@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.0](https://github.com/hesedcasa/api2cli/compare/v0.1.0...v0.2.0) (2026-06-04)
+
+
+### 🎉 Features
+
+* export registerApiCommands from package entry point ([3bc7dac](https://github.com/hesedcasa/api2cli/commit/3bc7dac5f3bb454deb73087330f217f3bf3a4c18))
+
+## Changelog
+
 
 All notable changes to this project will be documented in this file.
 
