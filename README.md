@@ -1,13 +1,13 @@
-# mcp-client
+# api2cli
 
-MCP client plugin — connects to MCP servers and registers tools as native CLI commands
+Import OpenAPI, Postman, and GraphQL specs and call their operations as native CLI commands
 
-[![Version](https://img.shields.io/npm/v/@hesed/mcp-client.svg)](https://npmjs.org/package/@hesed/mcp-client)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hesedcasa/@hesed/mcp-client/blob/main/LICENSE)
-[![Downloads/week](https://img.shields.io/npm/dw/@hesed/mcp-client.svg)](https://npmjs.org/package/@hesed/mcp-client)
+[![Version](https://img.shields.io/npm/v/@hesed/api2cli.svg)](https://npmjs.org/package/@hesed/api2cli)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hesedcasa/@hesed/api2cli/blob/main/LICENSE)
+[![Downloads/week](https://img.shields.io/npm/dw/@hesed/api2cli.svg)](https://npmjs.org/package/@hesed/api2cli)
 
 <!-- toc -->
-* [mcp-client](#mcp-client)
+* [api2cli](#api2cli)
 * [Usage](#usage)
 * [Commands](#commands)
 <!-- tocstop -->
