@@ -206,7 +206,7 @@ ARGUMENTS
   OPERATIONID  Operation ID to call (as shown in `api list <name>`)
 
 FLAGS
-  -p, --profile=<value>    Auth profile to use for this request
+  -p, --profile=<value>    Authentication profile name
       --base-url=<value>   Override the base URL for this request
       --body=<value>...    Request body field as key=value (repeatable)
       --header=<value>...  Extra request header as Key=Value (repeatable)

@@ -66,7 +66,7 @@ export default class ApiCall extends Command {
     }),
     profile: Flags.string({
       char: 'p',
-      description: 'Auth profile to use for this request',
+      description: 'Authentication profile name',
       required: false,
     }),
     raw: Flags.boolean({
