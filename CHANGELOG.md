@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/hesedcasa/api2cli/compare/v0.3.0...v0.3.1) (2026-06-05)
+
+
+### 🛠️ Fixes
+
+* unify profile description ([1e46f38](https://github.com/hesedcasa/api2cli/commit/1e46f38b652ab33c9daed0f930f7e7f8bc95a7f2))
+
 ## [0.3.0](https://github.com/hesedcasa/api2cli/compare/v0.2.0...v0.3.0) (2026-06-05)
 
 
