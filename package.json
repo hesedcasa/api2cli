@@ -1,6 +1,6 @@
 {
   "name": "@hesed/api2cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Import OpenAPI, Postman, and GraphQL specs and call their operations as native CLI commands",
   "author": "Hesed",
   "bin": {
