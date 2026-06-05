@@ -19,7 +19,7 @@ export default class ApiList extends Command {
     const specs = Object.values(store.specs)
 
     if (specs.length === 0) {
-      this.log('No API specs imported yet. Run `api import` to add one.')
+      this.log("No API specs imported yet. Run 'api import' to add one.")
       return
     }
 
@@ -35,7 +35,7 @@ export default class ApiList extends Command {
       if (spec.description) this.log(spec.description)
       this.log(`  Base URL: ${(auth?.baseUrl ?? spec.baseUrl) || '(not set)'}`)
       this.log(`  Source  : ${spec.source}`)
-      this.log(`  Auth    : ${auth ? auth.type : 'none'} (run 'api auth list --api ${spec.name}' to manage)`)
+      this.log(`  Auth    : ${auth ? auth.type : 'none'} (run 'api auth list ${spec.name}' to manage)`)
       this.log(`\nOperations (${spec.operations.length}):\n`)
 
       for (const op of spec.operations) {

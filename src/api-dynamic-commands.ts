@@ -13,7 +13,7 @@ import {
   readStore,
   type StoredOperation,
 } from './api-store.js'
-import {createApiAuthManager} from './auth-store.js'
+import {loadApiAuthConfig} from './auth-store.js'
 
 async function readStdin(): Promise<string> {
   const parts: string[] = []
@@ -144,6 +144,11 @@ function createOperationCommand(
       multiple: true,
       required: false,
     }),
+    profile: Flags.string({
+      char: 'p',
+      description: 'Authentication profile name',
+      required: false,
+    }),
     toon: Flags.boolean({
       description: 'Encode JSON output with TOON for token-efficient LLM consumption',
       required: false,
@@ -220,14 +225,17 @@ function createOperationCommand(
       // We must cast because TypeScript cannot statically know the dynamic arg/flag types
       const {args: a, flags: f} = await this.parse(DynamicOperationCommand as unknown as typeof Command)
 
-      const [store, auth] = await Promise.all([
-        readStore(this.config.configDir),
-        createApiAuthManager(this.config, capturedSpecName).loadAuthConfig(),
-      ])
+      const store = await readStore(this.config.configDir)
       const spec = store.specs[capturedSpecName]
       if (!spec) {
         this.error(`Spec "${capturedSpecName}" was removed. Run 'api list' to see available specs.`)
       }
+
+      const auth = await loadApiAuthConfig(this.config, capturedSpecName, f.profile as string | undefined).catch(
+        (error: Error) => {
+          this.error(error.message)
+        },
+      )
 
       const baseUrl = auth?.baseUrl ?? spec.baseUrl
       if (!baseUrl) {

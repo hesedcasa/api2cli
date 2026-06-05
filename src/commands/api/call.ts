@@ -11,7 +11,7 @@ import {
   readStore,
   type StoredOperation,
 } from '../../api-store.js'
-import {createApiAuthManager} from '../../auth-store.js'
+import {loadApiAuthConfig} from '../../auth-store.js'
 
 /**
  * Minimal interface for the fetch-like function used to make HTTP requests.
@@ -29,7 +29,7 @@ export interface FetchLike {
 export default class ApiCall extends Command {
   static args = {
     name: Args.string({
-      description: 'API name (as shown in `api list`)',
+      description: "API name (as shown in 'api list')",
       required: true,
     }),
     operationId: Args.string({
@@ -64,6 +64,11 @@ export default class ApiCall extends Command {
       multiple: true,
       required: false,
     }),
+    profile: Flags.string({
+      char: 'p',
+      description: 'Auth profile to use for this request',
+      required: false,
+    }),
     raw: Flags.boolean({
       description: 'Print the raw response body without JSON formatting',
       required: false,
@@ -83,14 +88,15 @@ export default class ApiCall extends Command {
   async run(): Promise<void> {
     const {args, flags} = await this.parse(ApiCall)
 
-    const [store, auth] = await Promise.all([
-      readStore(this.config.configDir),
-      createApiAuthManager(this.config, args.name).loadAuthConfig(),
-    ])
+    const store = await readStore(this.config.configDir)
     const spec = store.specs[args.name]
     if (!spec) {
       this.error(`No spec found with name "${args.name}". Run 'api list' to see available specs.`)
     }
+
+    const auth = await loadApiAuthConfig(this.config, args.name, flags.profile).catch((error: Error) => {
+      this.error(error.message)
+    })
 
     const operation: StoredOperation | undefined = spec.operations.find((o) => o.operationId === args.operationId)
     if (!operation) {

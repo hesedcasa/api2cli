@@ -58,7 +58,7 @@ export default class ApiImport extends Command {
       required: false,
     }),
     'base-url': Flags.string({
-      description: 'Override the base URL for API calls (GraphQL endpoint URL for GraphQL imports)',
+      description: 'Override the base URL for API calls',
       required: false,
     }),
     graphql: Flags.boolean({
@@ -68,11 +68,11 @@ export default class ApiImport extends Command {
     }),
     insecure: Flags.boolean({
       default: false,
-      description: 'Skip TLS certificate verification (useful for self-signed certs)',
+      description: 'Skip TLS certificate verification (for self-signed certs)',
       required: false,
     }),
     name: Flags.string({
-      description: 'Short identifier for this API (defaults to the spec title slug)',
+      description: 'Short identifier for this API (defaults to title slug)',
       required: false,
     }),
     password: Flags.string({
@@ -124,7 +124,7 @@ export default class ApiImport extends Command {
     if (!baseUrl) {
       this.warn(
         useGraphQL
-          ? 'No base URL set. GraphQL imports from SDL need --base-url pointing at the GraphQL endpoint.'
+          ? 'No base URL set. Required for GraphQL imported from SDL.'
           : 'Could not determine a base URL from the spec. Use --base-url to set one.',
       )
     }
