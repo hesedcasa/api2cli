@@ -14,6 +14,28 @@ export function createApiAuthManager(config: Config, apiName: string, profile?: 
   return createProfileManager<AuthScheme>(config, profile, authFile(apiName))
 }
 
+export async function loadApiAuthConfig(
+  config: Config,
+  apiName: string,
+  profile?: string,
+): Promise<AuthScheme | undefined> {
+  if (profile === undefined) return createApiAuthManager(config, apiName).loadAuthConfig()
+
+  const pm = createApiAuthManager(config, apiName, profile)
+  let profiles: Record<string, AuthScheme>
+  try {
+    profiles = (await pm.readProfiles()) as Record<string, AuthScheme>
+  } catch {
+    throw new Error(`Profile '${profile}' does not exist for "${apiName}".`)
+  }
+
+  if (!(profile in profiles)) {
+    throw new Error(`Profile '${profile}' does not exist for "${apiName}".`)
+  }
+
+  return pm.loadAuthConfig()
+}
+
 export async function deleteAuthFile(configDir: string, apiName: string): Promise<void> {
   await unlink(join(configDir, authFile(apiName))).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== 'ENOENT') throw error

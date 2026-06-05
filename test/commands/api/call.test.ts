@@ -3,6 +3,7 @@ import {mkdtemp, rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 
+import AuthAdd from '../../../src/commands/api/auth/add.js'
 import ApiCall from '../../../src/commands/api/call.js'
 import {makeConfig, makeFetch, makeOperation, makeSpec, runCmd, seedStore} from '../../helpers.js'
 
@@ -125,6 +126,40 @@ describe('api call', () => {
       config,
     )
     expect(logs[0]).to.equal('GET https://override.example.com/pets')
+  })
+
+  it('uses the selected auth profile for base URL and headers', async () => {
+    const op = makeOperation('listPets', {method: 'get', path: '/pets'})
+    await seedStore(tmpDir, [makeSpec('petstore', {operations: [op]})])
+    const config = makeConfig(tmpDir)
+    await runCmd(AuthAdd, ['petstore', '--type', 'none'], config)
+    await runCmd(
+      AuthAdd,
+      ['petstore', '--type', 'bearer', '--token', 'prod-token', '--base-url', 'https://prod.example.com', '-p', 'prod'],
+      config,
+    )
+
+    const requests: Array<{body?: null | string; headers?: Record<string, string>; method?: string}> = []
+    const {logs} = await runCmd(
+      class extends ApiCall {
+        override _fetch = async (_url: string, init?: (typeof requests)[number]) => {
+          if (init) requests.push(init)
+          return {ok: true, status: 200, statusText: 'OK', text: async () => '[]'}
+        }
+      },
+      ['petstore', 'listPets', '-p', 'prod'],
+      config,
+    )
+
+    expect(logs[0]).to.equal('GET https://prod.example.com/pets')
+    expect(requests[0].headers?.Authorization).to.equal('Bearer prod-token')
+  })
+
+  it('errors when an explicit auth profile does not exist', async () => {
+    const op = makeOperation('listPets', {method: 'get', path: '/pets'})
+    await seedStore(tmpDir, [makeSpec('petstore', {operations: [op]})])
+    const {cliError} = await runCmd(ApiCall, ['petstore', 'listPets', '-p', 'missing'], makeConfig(tmpDir))
+    expect(cliError?.message).to.include("Profile 'missing'")
   })
 
   it('prints raw response text when --raw is passed', async () => {

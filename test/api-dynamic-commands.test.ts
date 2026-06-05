@@ -6,6 +6,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 
 import {registerApiCommands} from '../src/api-dynamic-commands.js'
+import {createApiAuthManager} from '../src/auth-store.js'
 import hook from '../src/hooks/init/register-api-commands.js'
 import {makeFetch, makeOperation, makeSpec, seedStore} from './helpers.js'
 
@@ -181,6 +182,24 @@ describe('api-dynamic-commands', () => {
       cmd._fetch = makeFetch('[]')
       await cmd.run()
       expect(logs[0]).to.include('limit=10')
+    })
+
+    it('uses the selected auth profile for base URL and headers', async () => {
+      const op = makeOperation('listPets', {method: 'get', path: '/pets'})
+      const requests: Array<{body?: null | string; headers?: Record<string, string>; method?: string}> = []
+      const {cmd, logs} = await buildDynamicCmd(tmpDir, op, ['-p', 'prod'])
+      const pm = createApiAuthManager(cmd.config, 'petstore')
+      await pm.saveProfiles({
+        prod: {baseUrl: 'https://prod.example.com', scheme: 'bearer', token: 'prod-token', type: 'http'},
+      })
+      cmd._fetch = async (_url: string, init: (typeof requests)[number]) => {
+        requests.push(init)
+        return {ok: true, status: 200, statusText: 'OK', text: async () => '[]'}
+      }
+
+      await cmd.run()
+      expect(logs[0]).to.equal('GET https://prod.example.com/pets')
+      expect(requests[0].headers?.Authorization).to.equal('Bearer prod-token')
     })
 
     it('sends required body params in the POST body', async () => {
