@@ -11,7 +11,7 @@
     "@hesed/plugin-lib": "^0.8.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@oclif/core": "^4",
-    "@scalar/openapi-parser": "^0.25.6",
+    "@scalar/openapi-parser": "^0.28.7",
     "@scalar/postman-to-openapi": "^0.7.8",
     "@scalar/types": "^0.12.2",
     "@toon-format/toon": "^2.3.0",
