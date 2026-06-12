@@ -4,7 +4,7 @@
   "description": "Import OpenAPI, Postman, and GraphQL specs and call their operations as native CLI commands",
   "author": "Hesed",
   "bin": {
-    "api2cli": "./bin/run.js"
+    "api": "./bin/run.js"
   },
   "bugs": "https://github.com/hesedcasa/api2cli/issues",
   "dependencies": {
@@ -53,11 +53,12 @@
   "main": "dist/index.js",
   "type": "module",
   "oclif": {
-    "bin": "api2cli",
-    "dirname": "api2cli",
+    "bin": "api",
+    "dirname": "api",
     "commands": "./dist/commands",
+    "topicSeparator": " ",
     "hooks": {
-      "init": "./dist/hooks/init/register-api2cli-commands"
+      "init": "./dist/hooks/init/register-api-commands"
     },
     "topics": {}
   },

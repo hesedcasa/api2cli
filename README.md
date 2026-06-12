@@ -17,13 +17,13 @@ Import OpenAPI, Postman, and GraphQL specs and call their operations as native C
 <!-- usage -->
 ```sh-session
 $ npm install -g @hesed/api2cli
-$ api2cli COMMAND
+$ api COMMAND
 running command...
-$ api2cli (--version)
-@hesed/api2cli/0.3.1 linux-x64 node-v22.22.3
-$ api2cli --help [COMMAND]
+$ api (--version)
+@hesed/api2cli/0.3.1 darwin-arm64 node-v22.14.0
+$ api --help [COMMAND]
 USAGE
-  $ api2cli COMMAND
+  $ api COMMAND
 ...
 ```
 <!-- usagestop -->
@@ -31,24 +31,24 @@ USAGE
 # Commands
 
 <!-- commands -->
-* [`api2cli api:auth:add API`](#api2cli-apiauthadd-api)
-* [`api2cli api:auth:delete API`](#api2cli-apiauthdelete-api)
-* [`api2cli api:auth:list API`](#api2cli-apiauthlist-api)
-* [`api2cli api:auth:profile API`](#api2cli-apiauthprofile-api)
-* [`api2cli api:auth:update API`](#api2cli-apiauthupdate-api)
-* [`api2cli api:call NAME OPERATIONID`](#api2cli-apicall-name-operationid)
-* [`api2cli api:config NAME`](#api2cli-apiconfig-name)
-* [`api2cli api:import SOURCE`](#api2cli-apiimport-source)
-* [`api2cli api:list [NAME]`](#api2cli-apilist-name)
-* [`api2cli api:remove NAME`](#api2cli-apiremove-name)
+* [`api api auth add API`](#api-api-auth-add-api)
+* [`api api auth delete API`](#api-api-auth-delete-api)
+* [`api api auth list API`](#api-api-auth-list-api)
+* [`api api auth profile API`](#api-api-auth-profile-api)
+* [`api api auth update API`](#api-api-auth-update-api)
+* [`api api call NAME OPERATIONID`](#api-api-call-name-operationid)
+* [`api api config NAME`](#api-api-config-name)
+* [`api api import SOURCE`](#api-api-import-source)
+* [`api api list [NAME]`](#api-api-list-name)
+* [`api api remove NAME`](#api-api-remove-name)
 
-## `api2cli api:auth:add API`
+## `api api auth add API`
 
 Add an auth profile for an imported API
 
 ```
 USAGE
-  $ api2cli api:auth:add API --type none|bearer|apikey|basic|custom [--api-key <value>] [--api-key-header <value>]
+  $ api api auth add API --type none|bearer|apikey|basic|custom [--api-key <value>] [--api-key-header <value>]
     [--base-url <value>] [--header <value>...] [--password <value>] [-p <value>] [--token <value>] [--username <value>]
 
 ARGUMENTS
@@ -70,28 +70,28 @@ DESCRIPTION
   Add an auth profile for an imported API
 
 EXAMPLES
-  $ api2cli api auth add petstore --type bearer --token sk-...
+  $ api api auth add petstore --type bearer --token sk-...
 
-  $ api2cli api auth add petstore --type apikey --api-key mykey -p prod
+  $ api api auth add petstore --type apikey --api-key mykey -p prod
 
-  $ api2cli api auth add petstore --type basic --username user --password secret
+  $ api api auth add petstore --type basic --username user --password secret
 
-  $ api2cli api auth add petstore --type custom --header X-Tenant-ID=acme --header X-App-Key=secret
+  $ api api auth add petstore --type custom --header X-Tenant-ID=acme --header X-App-Key=secret
 
-  $ api2cli api auth add petstore --type bearer --token sk-... --base-url https://api.prod.example.com
+  $ api api auth add petstore --type bearer --token sk-... --base-url https://api.prod.example.com
 
-  $ api2cli api auth add petstore --type none
+  $ api api auth add petstore --type none
 ```
 
 _See code: [src/commands/api/auth/add.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/auth/add.ts)_
 
-## `api2cli api:auth:delete API`
+## `api api auth delete API`
 
 Delete an auth profile for an imported API
 
 ```
 USAGE
-  $ api2cli api:auth:delete API [-p <value>]
+  $ api api auth delete API [-p <value>]
 
 ARGUMENTS
   API  API name
@@ -103,20 +103,20 @@ DESCRIPTION
   Delete an auth profile for an imported API
 
 EXAMPLES
-  $ api2cli api auth delete petstore
+  $ api api auth delete petstore
 
-  $ api2cli api auth delete petstore -p prod
+  $ api api auth delete petstore -p prod
 ```
 
 _See code: [src/commands/api/auth/delete.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/auth/delete.ts)_
 
-## `api2cli api:auth:list API`
+## `api api auth list API`
 
 List auth profiles for an imported API
 
 ```
 USAGE
-  $ api2cli api:auth:list API
+  $ api api auth list API
 
 ARGUMENTS
   API  API name
@@ -125,18 +125,18 @@ DESCRIPTION
   List auth profiles for an imported API
 
 EXAMPLES
-  $ api2cli api auth list petstore
+  $ api api auth list petstore
 ```
 
 _See code: [src/commands/api/auth/list.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/auth/list.ts)_
 
-## `api2cli api:auth:profile API`
+## `api api auth profile API`
 
 Get or set the default auth profile for an imported API
 
 ```
 USAGE
-  $ api2cli api:auth:profile API [--default <value>]
+  $ api api auth profile API [--default <value>]
 
 ARGUMENTS
   API  API name
@@ -148,20 +148,20 @@ DESCRIPTION
   Get or set the default auth profile for an imported API
 
 EXAMPLES
-  $ api2cli api auth profile petstore
+  $ api api auth profile petstore
 
-  $ api2cli api auth profile petstore --default prod
+  $ api api auth profile petstore --default prod
 ```
 
 _See code: [src/commands/api/auth/profile.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/auth/profile.ts)_
 
-## `api2cli api:auth:update API`
+## `api api auth update API`
 
 Update an auth profile for an imported API
 
 ```
 USAGE
-  $ api2cli api:auth:update API --type none|bearer|apikey|basic|custom [--api-key <value>] [--api-key-header <value>]
+  $ api api auth update API --type none|bearer|apikey|basic|custom [--api-key <value>] [--api-key-header <value>]
     [--base-url <value>] [--header <value>...] [--password <value>] [-p <value>] [--token <value>] [--username <value>]
 
 ARGUMENTS
@@ -183,22 +183,22 @@ DESCRIPTION
   Update an auth profile for an imported API
 
 EXAMPLES
-  $ api2cli api auth update petstore --type bearer --token sk-new
+  $ api api auth update petstore --type bearer --token sk-new
 
-  $ api2cli api auth update petstore --type apikey --api-key newkey -p prod
+  $ api api auth update petstore --type apikey --api-key newkey -p prod
 
-  $ api2cli api auth update petstore --type bearer --token sk-... --base-url https://api.prod.example.com -p prod
+  $ api api auth update petstore --type bearer --token sk-... --base-url https://api.prod.example.com -p prod
 ```
 
 _See code: [src/commands/api/auth/update.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/auth/update.ts)_
 
-## `api2cli api:call NAME OPERATIONID`
+## `api api call NAME OPERATIONID`
 
 Call an imported API operation
 
 ```
 USAGE
-  $ api2cli api:call NAME OPERATIONID [--base-url <value>] [--body <value>...] [--header <value>...] [--param
+  $ api api call NAME OPERATIONID [--base-url <value>] [--body <value>...] [--header <value>...] [--param
     <value>...] [-p <value>] [--raw] [--toon]
 
 ARGUMENTS
@@ -218,25 +218,25 @@ DESCRIPTION
   Call an imported API operation
 
 EXAMPLES
-  $ api2cli api call petstore listPets
+  $ api api call petstore listPets
 
-  $ api2cli api call petstore getPetById --param petId=42
+  $ api api call petstore getPetById --param petId=42
 
-  $ api2cli api call petstore createPet --body name=Fido --body tag=dog
+  $ api api call petstore createPet --body name=Fido --body tag=dog
 
-  $ api2cli api call petstore listPets --query limit=10 --header X-Trace=abc
+  $ api api call petstore listPets --query limit=10 --header X-Trace=abc
 ```
 
 _See code: [src/commands/api/call.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/call.ts)_
 
-## `api2cli api:config NAME`
+## `api api config NAME`
 
 Update configuration for an imported API spec
 
 ```
 USAGE
-  $ api2cli api:config NAME [--base-url <value>] [--description <value>] [--insecure] [--rename <value>]
-    [--title <value>]
+  $ api api config NAME [--base-url <value>] [--description <value>] [--insecure] [--rename <value>] [--title
+    <value>]
 
 ARGUMENTS
   NAME  API name (as shown in `api list`)
@@ -252,24 +252,24 @@ DESCRIPTION
   Update configuration for an imported API spec
 
 EXAMPLES
-  $ api2cli api config petstore --base-url https://api.example.com
+  $ api api config petstore --base-url https://api.example.com
 
-  $ api2cli api config petstore --rename mystore
+  $ api api config petstore --rename mystore
 
-  $ api2cli api config petstore --title "My Petstore" --description "A pet store API"
+  $ api api config petstore --title "My Petstore" --description "A pet store API"
 ```
 
 _See code: [src/commands/api/config.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/config.ts)_
 
-## `api2cli api:import SOURCE`
+## `api api import SOURCE`
 
 Import an OpenAPI spec, Postman collection, or GraphQL schema (SDL/introspection/endpoint) and register its operations as commands
 
 ```
 USAGE
-  $ api2cli api:import SOURCE [--api-key <value>] [--api-key-header <value>] [--auth-type
-    none|bearer|apikey|basic] [--base-url <value>] [--graphql] [--insecure] [--name <value>] [--password <value>]
-    [--selection-depth <value>] [--token <value>] [--username <value>]
+  $ api api import SOURCE [--api-key <value>] [--api-key-header <value>] [--auth-type none|bearer|apikey|basic]
+    [--base-url <value>] [--graphql] [--insecure] [--name <value>] [--password <value>] [--selection-depth <value>]
+    [--token <value>] [--username <value>]
 
 ARGUMENTS
   SOURCE  Path to a local OpenAPI/Postman/GraphQL spec or URL (REST or GraphQL endpoint)
@@ -293,32 +293,32 @@ DESCRIPTION
   as commands
 
 EXAMPLES
-  $ api2cli api import ./petstore.json  --name petstore
+  $ api api import ./petstore.json  --name petstore
 
-  $ api2cli api import ./postman_collection.json --name myapi
+  $ api api import ./postman_collection.json --name myapi
 
-  $ api2cli api import https://petstore3.swagger.io/api/v3/openapi.json
+  $ api api import https://petstore3.swagger.io/api/v3/openapi.json
 
-  $ api2cli api import ./schema.graphql --base-url https://api.example.com/graphql
+  $ api api import ./schema.graphql --base-url https://api.example.com/graphql
 
-  $ api2cli api import https://api.example.com/graphql --name github
+  $ api api import https://api.example.com/graphql --name github
 
-  $ api2cli api import ./api.yaml --auth-type bearer --token sk-...
+  $ api api import ./api.yaml --auth-type bearer --token sk-...
 
-  $ api2cli api import ./api.yaml --auth-type apikey --api-key mykey --api-key-header X-API-Key
+  $ api api import ./api.yaml --auth-type apikey --api-key mykey --api-key-header X-API-Key
 
-  $ api2cli api import ./api.yaml --auth-type basic --username user --password pass
+  $ api api import ./api.yaml --auth-type basic --username user --password pass
 ```
 
 _See code: [src/commands/api/import.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/import.ts)_
 
-## `api2cli api:list [NAME]`
+## `api api list [NAME]`
 
 List imported API specs and their available operations
 
 ```
 USAGE
-  $ api2cli api:list [NAME]
+  $ api api list [NAME]
 
 ARGUMENTS
   [NAME]  API name to list operations for (omit to list all imported APIs)
@@ -327,20 +327,20 @@ DESCRIPTION
   List imported API specs and their available operations
 
 EXAMPLES
-  $ api2cli api list
+  $ api api list
 
-  $ api2cli api list petstore
+  $ api api list petstore
 ```
 
 _See code: [src/commands/api/list.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/list.ts)_
 
-## `api2cli api:remove NAME`
+## `api api remove NAME`
 
 Remove an imported API spec
 
 ```
 USAGE
-  $ api2cli api:remove NAME
+  $ api api remove NAME
 
 ARGUMENTS
   NAME  API name to remove
@@ -349,7 +349,7 @@ DESCRIPTION
   Remove an imported API spec
 
 EXAMPLES
-  $ api2cli api remove petstore
+  $ api api remove petstore
 ```
 
 _See code: [src/commands/api/remove.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.1/src/commands/api/remove.ts)_
