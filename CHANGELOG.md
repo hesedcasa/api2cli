@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/hesedcasa/api2cli/compare/v0.3.1...v0.3.2) (2026-06-12)
+
+
+### 🛠️ Fixes
+
+* rename CLI binary from api2cli to api ([daf5835](https://github.com/hesedcasa/api2cli/commit/daf5835d4de12926f1453fbe960c81aaa5849a97))
+
 ## [0.3.1](https://github.com/hesedcasa/api2cli/compare/v0.3.0...v0.3.1) (2026-06-05)
 
 
