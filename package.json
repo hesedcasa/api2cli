@@ -13,7 +13,7 @@
     "@oclif/core": "^4",
     "@scalar/openapi-parser": "^0.25.6",
     "@scalar/postman-to-openapi": "^0.7.8",
-    "@scalar/types": "^0.12.2",
+    "@scalar/types": "^0.14.0",
     "@toon-format/toon": "^2.3.0",
     "graphql": "^16.13.2",
     "js-yaml": "^4.1.1"
