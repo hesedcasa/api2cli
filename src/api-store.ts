@@ -502,7 +502,7 @@ export function buildInsecureFetch(): FetchLike {
           res.on('end', () => {
             const body = Buffer.concat(chunks)
             resolve({
-              arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
+              arrayBuffer: async () => new Uint8Array(body).buffer,
               // Already an exact-length copy of the body — return it directly instead of
               // re-copying via arrayBuffer().
               buffer: async () => body,
