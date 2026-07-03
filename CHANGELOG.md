@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/hesedcasa/api2cli/compare/v0.3.2...v0.4.0) (2026-07-03)
+
+
+### 🎉 Features
+
+* add --output file flag and command_not_found hook ([ad0d363](https://github.com/hesedcasa/api2cli/commit/ad0d3636eca6418e5794339a5c3266a05dac3b6a))
+* add --output file flag and command_not_found hook ([eeec241](https://github.com/hesedcasa/api2cli/commit/eeec24149a39f84ad6959247269d98b59bcae844))
+
+
+### 🛠️ Fixes
+
+* return exact-length copy from arrayBuffer in insecure fetch ([ff3f1f1](https://github.com/hesedcasa/api2cli/commit/ff3f1f14bec165e791f2613b4ea7bb0a7449598a))
+
 ## [0.3.2](https://github.com/hesedcasa/api2cli/compare/v0.3.1...v0.3.2) (2026-06-12)
 
 
