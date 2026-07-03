@@ -58,6 +58,7 @@
     "commands": "./dist/commands",
     "topicSeparator": " ",
     "hooks": {
+      "command_not_found": "./dist/hooks/command_not_found/resolve-dynamic-command",
       "init": "./dist/hooks/init/register-api-commands"
     },
     "topics": {}

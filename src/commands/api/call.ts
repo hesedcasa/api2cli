@@ -1,5 +1,6 @@
 import {Args, Command, Flags} from '@oclif/core'
 import {encode} from '@toon-format/toon'
+import {writeFile} from 'node:fs/promises'
 
 import {
   buildAuthHeaders,
@@ -7,24 +8,15 @@ import {
   buildInsecureFetch,
   buildUrl,
   coerceBodyValue,
+  type FetchLike,
   parseKV,
+  readResponseBytes,
   readStore,
+  startSpinner,
+  stopSpinner,
   type StoredOperation,
 } from '../../api-store.js'
 import {loadApiAuthConfig} from '../../auth-store.js'
-
-/**
- * Minimal interface for the fetch-like function used to make HTTP requests.
- * Using a structural type here makes the property easy to mock in tests without
- * depending on the global `fetch` type, which ESLint flags as experimental for Node < 21.
- */
-// ts-prune-ignore-next
-export interface FetchLike {
-  (
-    url: string,
-    init?: {body?: null | string; headers?: Record<string, string>; method?: string},
-  ): Promise<{ok: boolean; status: number; statusText: string; text: () => Promise<string>}>
-}
 
 export default class ApiCall extends Command {
   static args = {
@@ -57,6 +49,12 @@ export default class ApiCall extends Command {
     header: Flags.string({
       description: 'Extra request header as Key=Value (repeatable)',
       multiple: true,
+      required: false,
+    }),
+    output: Flags.string({
+      char: 'o',
+      description: 'Write the raw response body to a file (required for binary responses such as zip archives)',
+      exclusive: ['toon', 'raw'],
       required: false,
     }),
     param: Flags.string({
@@ -159,16 +157,32 @@ export default class ApiCall extends Command {
 
     this.log(`${method} ${url.toString()}`)
 
+    // A spinner (on stderr, so piped stdout stays clean) reassures the user
+    // while the request is in flight — downloads to a file can be large
+    // binaries such as zips, and even plain responses can be slow.
+    startSpinner(flags.output ? `Downloading to ${flags.output}` : `${method} request`)
+
     const fetchFn = spec.insecure ? buildInsecureFetch() : this._fetch
     const res = await fetchFn(url.toString(), reqInit).catch((error: Error) => {
+      stopSpinner('failed')
       this.error(`Request failed: ${error.message}`)
     })
 
-    const responseText = await res.text()
-
     if (!res.ok) {
+      stopSpinner('failed')
       this.warn(`HTTP ${res.status} ${res.statusText}`)
     }
+
+    if (flags.output && res.ok) {
+      const body = await readResponseBytes(res)
+      await writeFile(flags.output, body)
+      stopSpinner(`saved ${body.length} bytes`)
+      this.log(`Saved ${body.length} bytes to ${flags.output}`)
+      return
+    }
+
+    stopSpinner()
+    const responseText = await res.text()
 
     if (flags.raw) {
       this.log(responseText)
@@ -183,6 +197,10 @@ export default class ApiCall extends Command {
       } catch {
         this.log(responseText)
       }
+    }
+
+    if (flags.output) {
+      this.error(`Not writing ${flags.output}: request failed with HTTP ${res.status}`)
     }
   }
 

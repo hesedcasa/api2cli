@@ -102,7 +102,13 @@ describe('api call', () => {
       class extends ApiCall {
         override _fetch = async (_url: string, init?: (typeof requests)[number]) => {
           if (init) requests.push(init)
-          return {ok: true, status: 201, statusText: 'Created', text: async () => '{"id":1}'}
+          return {
+            arrayBuffer: async () => new ArrayBuffer(0),
+            ok: true,
+            status: 201,
+            statusText: 'Created',
+            text: async () => '{"id":1}',
+          }
         }
       },
       ['petstore', 'createPet', '--body', 'name=Fido'],
@@ -144,7 +150,13 @@ describe('api call', () => {
       class extends ApiCall {
         override _fetch = async (_url: string, init?: (typeof requests)[number]) => {
           if (init) requests.push(init)
-          return {ok: true, status: 200, statusText: 'OK', text: async () => '[]'}
+          return {
+            arrayBuffer: async () => new ArrayBuffer(0),
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            text: async () => '[]',
+          }
         }
       },
       ['petstore', 'listPets', '-p', 'prod'],
@@ -219,7 +231,13 @@ describe('api call', () => {
       class extends ApiCall {
         override _fetch = async (_url: string, init?: (typeof requests)[number]) => {
           if (init) requests.push(init)
-          return {ok: true, status: 200, statusText: 'OK', text: async () => '{"data":{}}'}
+          return {
+            arrayBuffer: async () => new ArrayBuffer(0),
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            text: async () => '{"data":{}}',
+          }
         }
       },
       ['myapi', 'listUsers'],
@@ -238,7 +256,13 @@ describe('api call', () => {
       class extends ApiCall {
         override _fetch = async (_url: string, init?: (typeof requests)[number]) => {
           if (init) requests.push(init)
-          return {ok: true, status: 200, statusText: 'OK', text: async () => '[]'}
+          return {
+            arrayBuffer: async () => new ArrayBuffer(0),
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            text: async () => '[]',
+          }
         }
       },
       ['petstore', 'listPets', '--header', 'X-Trace=abc'],
