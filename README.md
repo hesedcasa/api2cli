@@ -20,7 +20,7 @@ $ npm install -g @hesed/api2cli
 $ api COMMAND
 running command...
 $ api (--version)
-@hesed/api2cli/0.3.2 linux-x64 node-v22.22.3
+@hesed/api2cli/0.4.0 linux-x64 node-v22.23.1
 $ api --help [COMMAND]
 USAGE
   $ api COMMAND
@@ -83,7 +83,7 @@ EXAMPLES
   $ api api auth add petstore --type none
 ```
 
-_See code: [src/commands/api/auth/add.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/auth/add.ts)_
+_See code: [src/commands/api/auth/add.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/auth/add.ts)_
 
 ## `api api auth delete API`
 
@@ -108,7 +108,7 @@ EXAMPLES
   $ api api auth delete petstore -p prod
 ```
 
-_See code: [src/commands/api/auth/delete.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/auth/delete.ts)_
+_See code: [src/commands/api/auth/delete.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/auth/delete.ts)_
 
 ## `api api auth list API`
 
@@ -128,7 +128,7 @@ EXAMPLES
   $ api api auth list petstore
 ```
 
-_See code: [src/commands/api/auth/list.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/auth/list.ts)_
+_See code: [src/commands/api/auth/list.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/auth/list.ts)_
 
 ## `api api auth profile API`
 
@@ -153,7 +153,7 @@ EXAMPLES
   $ api api auth profile petstore --default prod
 ```
 
-_See code: [src/commands/api/auth/profile.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/auth/profile.ts)_
+_See code: [src/commands/api/auth/profile.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/auth/profile.ts)_
 
 ## `api api auth update API`
 
@@ -190,7 +190,7 @@ EXAMPLES
   $ api api auth update petstore --type bearer --token sk-... --base-url https://api.prod.example.com -p prod
 ```
 
-_See code: [src/commands/api/auth/update.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/auth/update.ts)_
+_See code: [src/commands/api/auth/update.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/auth/update.ts)_
 
 ## `api api call NAME OPERATIONID`
 
@@ -198,14 +198,15 @@ Call an imported API operation
 
 ```
 USAGE
-  $ api api call NAME OPERATIONID [--base-url <value>] [--body <value>...] [--header <value>...] [--param
-    <value>...] [-p <value>] [--raw] [--toon]
+  $ api api call NAME OPERATIONID [--base-url <value>] [--body <value>...] [--header <value>...] [-o <value> |
+    --toon | --raw] [--param <value>...] [-p <value>]
 
 ARGUMENTS
   NAME         API name (as shown in 'api list')
   OPERATIONID  Operation ID to call (as shown in `api list <name>`)
 
 FLAGS
+  -o, --output=<value>     Write the raw response body to a file (required for binary responses such as zip archives)
   -p, --profile=<value>    Authentication profile name
       --base-url=<value>   Override the base URL for this request
       --body=<value>...    Request body field as key=value (repeatable)
@@ -227,7 +228,7 @@ EXAMPLES
   $ api api call petstore listPets --query limit=10 --header X-Trace=abc
 ```
 
-_See code: [src/commands/api/call.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/call.ts)_
+_See code: [src/commands/api/call.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/call.ts)_
 
 ## `api api config NAME`
 
@@ -259,7 +260,7 @@ EXAMPLES
   $ api api config petstore --title "My Petstore" --description "A pet store API"
 ```
 
-_See code: [src/commands/api/config.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/config.ts)_
+_See code: [src/commands/api/config.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/config.ts)_
 
 ## `api api import SOURCE`
 
@@ -310,7 +311,7 @@ EXAMPLES
   $ api api import ./api.yaml --auth-type basic --username user --password pass
 ```
 
-_See code: [src/commands/api/import.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/import.ts)_
+_See code: [src/commands/api/import.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/import.ts)_
 
 ## `api api list [NAME]`
 
@@ -332,7 +333,7 @@ EXAMPLES
   $ api api list petstore
 ```
 
-_See code: [src/commands/api/list.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/list.ts)_
+_See code: [src/commands/api/list.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/list.ts)_
 
 ## `api api remove NAME`
 
@@ -352,5 +353,5 @@ EXAMPLES
   $ api api remove petstore
 ```
 
-_See code: [src/commands/api/remove.ts](https://github.com/hesedcasa/api2cli/blob/v0.3.2/src/commands/api/remove.ts)_
+_See code: [src/commands/api/remove.ts](https://github.com/hesedcasa/api2cli/blob/v0.4.0/src/commands/api/remove.ts)_
 <!-- commandsstop -->
