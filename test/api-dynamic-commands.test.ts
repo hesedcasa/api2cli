@@ -7,6 +7,7 @@ import {join} from 'node:path'
 
 import {registerApiCommands} from '../src/api-dynamic-commands.js'
 import {createApiAuthManager} from '../src/auth-store.js'
+import notFoundHook from '../src/hooks/command_not_found/resolve-dynamic-command.js'
 import hook from '../src/hooks/init/register-api-commands.js'
 import {makeFetch, makeOperation, makeSpec, seedStore} from './helpers.js'
 
@@ -270,6 +271,106 @@ describe('api-dynamic-commands', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await hook.call({} as never, {argv: [], config, context: {} as any, id: 'init'})
       // No error thrown — the hook swallows exceptions from registerApiCommands
+    })
+  })
+
+  // ─── command_not_found hook ──────────────────────────────────────────────────
+
+  describe('command_not_found hook', () => {
+    // With topicSeparator: ' ', oclif resolves the space-separated command id against its
+    // *static* command list before the init hook has registered our dynamic commands, so a
+    // call like `petstore getPet 42` gets every token — including positional args — swallowed
+    // into one unresolvable id: `petstore:getPet:42`. This hook must split that back apart.
+    it('re-dispatches to the dynamic command with swallowed args restored', async () => {
+      const op = makeOperation('getPet', {
+        method: 'get',
+        parameters: [{in: 'path' as const, name: 'id', required: true}],
+        path: '/pets/{id}',
+      })
+      const spec = makeSpec('petstore', {operations: [op]})
+      await seedStore(tmpDir, [spec])
+      const config = makeInternalConfig(tmpDir)
+      await registerApiCommands(config as unknown as Config)
+
+      const calls: Array<{argv: string[]; id: string}> = []
+      const configWithRunCommand = {
+        ...config,
+        async runCommand(id: string, argv: string[]) {
+          calls.push({argv, id})
+          return 'ran'
+        },
+      }
+
+      const result = await notFoundHook.call(
+        {
+          error() {
+            throw new Error('this.error should not be called')
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        {
+          argv: ['--toon'],
+          config: configWithRunCommand as unknown as Config,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          context: {} as any,
+          id: 'petstore:getPet:42',
+        },
+      )
+
+      expect(result).to.equal('ran')
+      expect(calls).to.deep.equal([{argv: ['42', '--toon'], id: 'petstore:getPet'}])
+    })
+
+    it('throws the standard not-found error when no matching operation exists', async () => {
+      const config = makeInternalConfig(tmpDir)
+      let thrownMessage: string | undefined
+
+      await notFoundHook
+        .call(
+          {
+            error(msg: string) {
+              thrownMessage = msg
+              throw new Error(msg)
+            },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+          {
+            argv: [],
+            config: config as unknown as Config,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            context: {} as any,
+            id: 'bogus:thing:1',
+          },
+        )
+        .catch(() => {})
+
+      expect(thrownMessage).to.equal('command bogus:thing:1 not found')
+    })
+
+    it('throws when the id has no swallowed args to recover', async () => {
+      const config = makeInternalConfig(tmpDir)
+      let thrownMessage: string | undefined
+
+      await notFoundHook
+        .call(
+          {
+            error(msg: string) {
+              thrownMessage = msg
+              throw new Error(msg)
+            },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+          {
+            argv: [],
+            config: config as unknown as Config,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            context: {} as any,
+            id: 'petstore:missingOp',
+          },
+        )
+        .catch(() => {})
+
+      expect(thrownMessage).to.equal('command petstore:missingOp not found')
     })
   })
 })

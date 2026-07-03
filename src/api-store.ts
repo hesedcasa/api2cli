@@ -1,3 +1,4 @@
+import {ux} from '@oclif/core'
 import {dereference} from '@scalar/openapi-parser'
 import {load as yamlLoad} from 'js-yaml'
 import {existsSync} from 'node:fs'
@@ -442,16 +443,45 @@ export function buildAuthHeaders(auth: AuthScheme): Record<string, string> {
   }
 }
 
+// ─── Fetch abstraction (shared by call.ts and api-dynamic-commands.ts) ────────
+
+/**
+ * Minimal interface for the fetch-like response used across the CLI. Using a
+ * structural type here makes it easy to mock in tests without depending on the
+ * global `fetch` type, which ESLint flags as experimental for Node < 21.
+ *
+ * `buffer` is an optional fast path for implementations (like the insecure
+ * fetch below) that already hold the body as a `Buffer` — it lets callers skip
+ * the extra copy that `Buffer.from(await arrayBuffer())` would otherwise make.
+ */
+export interface FetchResponseLike {
+  arrayBuffer: () => Promise<ArrayBuffer>
+  buffer?: () => Promise<Buffer>
+  ok: boolean
+  status: number
+  statusText: string
+  text: () => Promise<string>
+}
+
+export interface FetchLike {
+  (
+    url: string,
+    init?: {body?: null | string; headers?: Record<string, string>; method?: string},
+  ): Promise<FetchResponseLike>
+}
+
+/** Reads the full response body as a `Buffer`, avoiding a redundant copy when `buffer` is available. */
+export async function readResponseBytes(res: FetchResponseLike): Promise<Buffer> {
+  return res.buffer ? res.buffer() : Buffer.from(await res.arrayBuffer())
+}
+
 // ─── Insecure fetch (skips TLS verification) ──────────────────────────────────
 
 /**
  * Returns a fetch-compatible function that skips TLS certificate verification.
  * Use for APIs that serve self-signed certificates (e.g. Obsidian Local REST API).
  */
-export function buildInsecureFetch(): (
-  url: string,
-  init?: {body?: null | string; headers?: Record<string, string>; method?: string},
-) => Promise<{ok: boolean; status: number; statusText: string; text: () => Promise<string>}> {
+export function buildInsecureFetch(): FetchLike {
   return (url, init = {}) =>
     new Promise((resolve, reject) => {
       const u = new URL(url)
@@ -470,12 +500,16 @@ export function buildInsecureFetch(): (
           const chunks: Buffer[] = []
           res.on('data', (chunk: Buffer) => chunks.push(chunk))
           res.on('end', () => {
-            const text = Buffer.concat(chunks).toString('utf8')
+            const body = Buffer.concat(chunks)
             resolve({
+              arrayBuffer: async () => new Uint8Array(body).buffer,
+              // Already an exact-length copy of the body — return it directly instead of
+              // re-copying via arrayBuffer().
+              buffer: async () => body,
               ok: (res.statusCode ?? 0) >= 200 && (res.statusCode ?? 0) < 300,
               status: res.statusCode ?? 0,
               statusText: res.statusMessage ?? '',
-              text: async () => text,
+              text: async () => body.toString('utf8'),
             })
           })
           res.on('error', reject)
@@ -485,6 +519,22 @@ export function buildInsecureFetch(): (
       if (init.body) req.write(init.body)
       req.end()
     })
+}
+
+// ─── Progress spinner ─────────────────────────────────────────────────────────
+
+/**
+ * Starts a stderr spinner, but only in an interactive terminal. In non-TTY
+ * contexts (pipes, CI, tests) oclif's spinner degrades to plain "action... done"
+ * lines on stderr, which are just noise, so we skip it entirely there.
+ */
+export function startSpinner(action: string): void {
+  if (process.stderr.isTTY) ux.action.start(action)
+}
+
+/** Stops the spinner started by {@link startSpinner}. No-op when none is running. */
+export function stopSpinner(msg?: string): void {
+  if (process.stderr.isTTY) ux.action.stop(msg)
 }
 
 // ─── URL building ─────────────────────────────────────────────────────────────

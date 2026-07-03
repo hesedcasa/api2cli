@@ -1,6 +1,6 @@
 import type {Config} from '@oclif/core'
 
-import {type StoredOperation, type StoredSpec, writeStore} from '../src/api-store.js'
+import {type FetchLike, type StoredOperation, type StoredSpec, writeStore} from '../src/api-store.js'
 
 // ─── Config mock ──────────────────────────────────────────────────────────────
 
@@ -83,17 +83,16 @@ export function makeOperation(operationId: string, overrides: Partial<StoredOper
 export function makeFetch(
   responseBody: string,
   options: {ok?: boolean; status?: number; statusText?: string} = {},
-): (
-  url: string,
-  init?: {body?: null | string; headers?: Record<string, string>; method?: string},
-) => Promise<{
-  ok: boolean
-  status: number
-  statusText: string
-  text: () => Promise<string>
-}> {
+): FetchLike {
   const {ok = true, status = 200, statusText = 'OK'} = options
-  return async () => ({ok, status, statusText, text: async () => responseBody})
+  const body = Buffer.from(responseBody, 'utf8')
+  return async () => ({
+    arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
+    ok,
+    status,
+    statusText,
+    text: async () => responseBody,
+  })
 }
 
 // ─── Store setup helpers ──────────────────────────────────────────────────────

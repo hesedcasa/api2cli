@@ -2,6 +2,7 @@ import type {Config} from '@oclif/core/interfaces'
 
 import {Args, Command, Flags} from '@oclif/core'
 import {encode} from '@toon-format/toon'
+import {writeFile} from 'node:fs/promises'
 
 import {
   buildAuthHeaders,
@@ -9,8 +10,12 @@ import {
   buildInsecureFetch,
   buildUrl,
   coerceBodyValue,
+  type FetchLike,
   parseKV,
+  readResponseBytes,
   readStore,
+  startSpinner,
+  stopSpinner,
   type StoredOperation,
 } from './api-store.js'
 import {loadApiAuthConfig} from './auth-store.js'
@@ -23,15 +28,6 @@ async function readStdin(): Promise<string> {
   }
 
   return parts.join('')
-}
-
-// ─── Fetch abstraction (mirrors call.ts, exposed for testing) ─────────────────
-
-interface FetchLike {
-  (
-    url: string,
-    init?: {body?: null | string; headers?: Record<string, string>; method?: string},
-  ): Promise<{ok: boolean; status: number; statusText: string; text: () => Promise<string>}>
 }
 
 // ─── run() helpers ───────────────────────────────────────────────────────────
@@ -129,6 +125,13 @@ function createOperationCommand(
 ): typeof Command {
   const urlParamNames = new Set(op.parameters.map((p) => p.name))
 
+  // Spec-defined optional params overwrite same-named static flags below, so a
+  // param named "output" would otherwise be misread as a file path in run().
+  // When that happens the param keeps the name and file output is unavailable.
+  const outputFlagShadowed =
+    op.parameters.some((p) => !p.required && p.name === 'output') ||
+    (!urlParamNames.has('output') && op.bodyParams.output !== undefined && !op.bodyParams.output.required)
+
   // Maps body-param name → arg name (for required body params that become args)
   const bodyParamArgNames: Record<string, string> = {}
   // Maps body-param name → flag name (for optional body params that stay as flags)
@@ -153,6 +156,15 @@ function createOperationCommand(
       description: 'Encode JSON output with TOON for token-efficient LLM consumption',
       required: false,
     }),
+  }
+
+  if (!outputFlagShadowed) {
+    dynamicFlags.output = Flags.string({
+      char: 'o',
+      description: 'Write the raw response body to a file (required for binary responses such as zip archives)',
+      exclusive: ['toon'],
+      required: false,
+    })
   }
 
   // For operations with a raw (non-JSON) request body, expose a --body flag.
@@ -208,6 +220,7 @@ function createOperationCommand(
   const capturedSpecName = specName
   const capturedBodyParamArgNames = bodyParamArgNames
   const capturedBodyParamFlagNames = bodyParamFlagNames
+  const capturedOutputFlagShadowed = outputFlagShadowed
 
   class DynamicOperationCommand extends Command {
     // Cast required: dynamicArgs is built at runtime so TypeScript cannot verify the exact shape
@@ -282,17 +295,37 @@ function createOperationCommand(
       const method = capturedOp.method.toUpperCase()
       this.log(`${method} ${url.toString()}`)
 
+      // A spinner (on stderr, so piped stdout stays clean) reassures the user
+      // while the request is in flight — downloads to a file can be large
+      // binaries such as zips, and even plain responses can be slow.
+      const outputPath = capturedOutputFlagShadowed ? undefined : (f.output as string | undefined)
+      startSpinner(outputPath ? `Downloading to ${outputPath}` : `${method} request`)
+
       const fetchFn = spec.insecure ? buildInsecureFetch() : this._fetch
       const res = await fetchFn(url.toString(), {
         body: requestBody,
         headers,
         method,
       }).catch((error: Error) => {
+        stopSpinner('failed')
         this.error(`Request failed: ${error.message}`)
       })
 
+      if (!res.ok) {
+        stopSpinner('failed')
+        this.warn(`HTTP ${res.status} ${res.statusText}`)
+      }
+
+      if (outputPath && res.ok) {
+        const body = await readResponseBytes(res)
+        await writeFile(outputPath, body)
+        stopSpinner(`saved ${body.length} bytes`)
+        this.log(`Saved ${body.length} bytes to ${outputPath}`)
+        return
+      }
+
+      stopSpinner()
       const responseText = await res.text()
-      if (!res.ok) this.warn(`HTTP ${res.status} ${res.statusText}`)
 
       const useToon = Boolean((f as Record<string, unknown>).toon)
       try {
@@ -300,6 +333,10 @@ function createOperationCommand(
         this.log(useToon ? this._applyToon(parsed) : JSON.stringify(parsed, null, 2))
       } catch {
         this.log(responseText)
+      }
+
+      if (outputPath) {
+        this.error(`Not writing ${outputPath}: request failed with HTTP ${res.status}`)
       }
     }
   }
