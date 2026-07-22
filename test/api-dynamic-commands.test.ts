@@ -321,56 +321,48 @@ describe('api-dynamic-commands', () => {
       expect(calls).to.deep.equal([{argv: ['42', '--toon'], id: 'petstore:getPet'}])
     })
 
-    it('throws the standard not-found error when no matching operation exists', async () => {
+    it('returns without erroring when no matching operation exists', async () => {
       const config = makeInternalConfig(tmpDir)
-      let thrownMessage: string | undefined
 
-      await notFoundHook
-        .call(
-          {
-            error(msg: string) {
-              thrownMessage = msg
-              throw new Error(msg)
-            },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any,
-          {
-            argv: [],
-            config: config as unknown as Config,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            context: {} as any,
-            id: 'bogus:thing:1',
+      const result = await notFoundHook.call(
+        {
+          error() {
+            throw new Error('this.error should not be called')
           },
-        )
-        .catch(() => {})
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        {
+          argv: [],
+          config: config as unknown as Config,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          context: {} as any,
+          id: 'bogus:thing:1',
+        },
+      )
 
-      expect(thrownMessage).to.equal('command bogus:thing:1 not found')
+      expect(result).to.be.undefined
     })
 
-    it('throws when the id has no swallowed args to recover', async () => {
+    it('returns without erroring when the id has no swallowed args to recover', async () => {
       const config = makeInternalConfig(tmpDir)
-      let thrownMessage: string | undefined
 
-      await notFoundHook
-        .call(
-          {
-            error(msg: string) {
-              thrownMessage = msg
-              throw new Error(msg)
-            },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any,
-          {
-            argv: [],
-            config: config as unknown as Config,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            context: {} as any,
-            id: 'petstore:missingOp',
+      const result = await notFoundHook.call(
+        {
+          error() {
+            throw new Error('this.error should not be called')
           },
-        )
-        .catch(() => {})
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+        {
+          argv: [],
+          config: config as unknown as Config,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          context: {} as any,
+          id: 'petstore:missingOp',
+        },
+      )
 
-      expect(thrownMessage).to.equal('command petstore:missingOp not found')
+      expect(result).to.be.undefined
     })
   })
 })

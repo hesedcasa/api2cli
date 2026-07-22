@@ -16,6 +16,13 @@ import {readStore} from '../../api-store.js'
  * registered the dynamic commands, so we can recover here: split the
  * mis-joined id back into the real `spec:operationId` command plus the args
  * that got wrongly absorbed, and retry.
+ *
+ * When the id can't be recovered this way, the hook must return without
+ * erroring rather than calling `this.error(...)`. oclif runs every
+ * `command_not_found` hook concurrently via `Promise.all`, and a throw here
+ * would win the race against other hooks that are still legitimately
+ * pending — e.g. `@oclif/plugin-not-found`'s interactive "Did you mean X?"
+ * prompt — cutting them off before the user can respond.
  */
 const hook: Hook<'command_not_found'> = async function (opts) {
   const parts = opts.id.split(':')
@@ -27,8 +34,6 @@ const hook: Hook<'command_not_found'> = async function (opts) {
       return opts.config.runCommand(`${specName}:${operationId}`, [...swallowedArgs, ...(opts.argv ?? [])])
     }
   }
-
-  this.error(`command ${opts.id} not found`)
 }
 
 export default hook
