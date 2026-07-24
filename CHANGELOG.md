@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/hesedcasa/api2cli/compare/v0.4.0...v0.4.1) (2026-07-24)
+
+
+### 🛠️ Fixes
+
+* don't error out of command_not_found hook on unresolved ids ([#30](https://github.com/hesedcasa/api2cli/issues/30)) ([0e4078c](https://github.com/hesedcasa/api2cli/commit/0e4078ce8bca1ab8ffc73c8de1e5be3ae6e232fc))
+
 ## [0.4.0](https://github.com/hesedcasa/api2cli/compare/v0.3.2...v0.4.0) (2026-07-03)
 
 
