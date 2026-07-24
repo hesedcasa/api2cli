@@ -321,48 +321,62 @@ describe('api-dynamic-commands', () => {
       expect(calls).to.deep.equal([{argv: ['42', '--toon'], id: 'petstore:getPet'}])
     })
 
-    it('returns without erroring when no matching operation exists', async () => {
+    it('throws a plain error (not via this.error) when no matching operation exists', async () => {
       const config = makeInternalConfig(tmpDir)
+      let caught: unknown
 
-      const result = await notFoundHook.call(
-        {
-          error() {
-            throw new Error('this.error should not be called')
+      await notFoundHook
+        .call(
+          {
+            error() {
+              throw new Error('this.error should not be called')
+            },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+          {
+            argv: [],
+            config: config as unknown as Config,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            context: {} as any,
+            id: 'bogus:thing:1',
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
-        {
-          argv: [],
-          config: config as unknown as Config,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          context: {} as any,
-          id: 'bogus:thing:1',
-        },
-      )
+        )
+        .catch((error: unknown) => {
+          caught = error
+        })
 
-      expect(result).to.be.undefined
+      expect(caught).to.be.instanceOf(Error)
+      expect((caught as Error).message).to.equal('command bogus:thing:1 not found')
+      // A plain Error (no `.oclif.exit`) is what keeps this failure from
+      // short-circuiting other, still-pending `command_not_found` hooks.
+      expect(caught).to.not.have.property('oclif')
     })
 
-    it('returns without erroring when the id has no swallowed args to recover', async () => {
+    it('throws a plain error (not via this.error) when the id has no swallowed args to recover', async () => {
       const config = makeInternalConfig(tmpDir)
+      let thrownMessage: string | undefined
 
-      const result = await notFoundHook.call(
-        {
-          error() {
-            throw new Error('this.error should not be called')
+      await notFoundHook
+        .call(
+          {
+            error() {
+              throw new Error('this.error should not be called')
+            },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+          {
+            argv: [],
+            config: config as unknown as Config,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            context: {} as any,
+            id: 'petstore:missingOp',
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
-        {
-          argv: [],
-          config: config as unknown as Config,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          context: {} as any,
-          id: 'petstore:missingOp',
-        },
-      )
+        )
+        .catch((error: unknown) => {
+          thrownMessage = (error as Error).message
+        })
 
-      expect(result).to.be.undefined
+      expect(thrownMessage).to.equal('command petstore:missingOp not found')
     })
   })
 })
