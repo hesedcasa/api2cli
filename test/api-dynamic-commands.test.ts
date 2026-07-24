@@ -321,16 +321,15 @@ describe('api-dynamic-commands', () => {
       expect(calls).to.deep.equal([{argv: ['42', '--toon'], id: 'petstore:getPet'}])
     })
 
-    it('throws the standard not-found error when no matching operation exists', async () => {
+    it('throws a plain error (not via this.error) when no matching operation exists', async () => {
       const config = makeInternalConfig(tmpDir)
-      let thrownMessage: string | undefined
+      let caught: unknown
 
       await notFoundHook
         .call(
           {
-            error(msg: string) {
-              thrownMessage = msg
-              throw new Error(msg)
+            error() {
+              throw new Error('this.error should not be called')
             },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any,
@@ -342,21 +341,26 @@ describe('api-dynamic-commands', () => {
             id: 'bogus:thing:1',
           },
         )
-        .catch(() => {})
+        .catch((error: unknown) => {
+          caught = error
+        })
 
-      expect(thrownMessage).to.equal('command bogus:thing:1 not found')
+      expect(caught).to.be.instanceOf(Error)
+      expect((caught as Error).message).to.equal('command bogus:thing:1 not found')
+      // A plain Error (no `.oclif.exit`) is what keeps this failure from
+      // short-circuiting other, still-pending `command_not_found` hooks.
+      expect(caught).to.not.have.property('oclif')
     })
 
-    it('throws when the id has no swallowed args to recover', async () => {
+    it('throws a plain error (not via this.error) when the id has no swallowed args to recover', async () => {
       const config = makeInternalConfig(tmpDir)
       let thrownMessage: string | undefined
 
       await notFoundHook
         .call(
           {
-            error(msg: string) {
-              thrownMessage = msg
-              throw new Error(msg)
+            error() {
+              throw new Error('this.error should not be called')
             },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any,
@@ -368,7 +372,9 @@ describe('api-dynamic-commands', () => {
             id: 'petstore:missingOp',
           },
         )
-        .catch(() => {})
+        .catch((error: unknown) => {
+          thrownMessage = (error as Error).message
+        })
 
       expect(thrownMessage).to.equal('command petstore:missingOp not found')
     })

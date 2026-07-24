@@ -16,6 +16,24 @@ import {readStore} from '../../api-store.js'
  * registered the dynamic commands, so we can recover here: split the
  * mis-joined id back into the real `spec:operationId` command plus the args
  * that got wrongly absorbed, and retry.
+ *
+ * When the id can't be recovered this way, the hook must fail without
+ * winning the race against other, still-pending `command_not_found` hooks —
+ * e.g. `@oclif/plugin-not-found`'s interactive "Did you mean X?" prompt,
+ * which must not get cut off before the user can respond. oclif runs every
+ * `command_not_found` hook concurrently via `Promise.all` and re-throws (thus
+ * short-circuiting the other hooks) whenever a hook's error carries a
+ * non-zero `error.oclif.exit` — which `this.error(...)` always sets. So we
+ * throw a plain `Error` instead: it has no `.oclif.exit`, so oclif just
+ * records the failure and lets every hook finish naturally.
+ *
+ * Resolving successfully (e.g. returning `undefined`) instead of throwing
+ * would be worse: oclif treats *any* settled hook as "handled" and returns
+ * its result immediately, skipping the standard not-found fallback — so a
+ * plain typo would silently exit 0 whenever no other `command_not_found`
+ * hook is installed to catch it. Throwing keeps this hook's failure
+ * available for oclif's own fallback (`throw hookResult.failures[0].error`)
+ * to surface with the expected non-zero exit if nothing else handles it.
  */
 const hook: Hook<'command_not_found'> = async function (opts) {
   const parts = opts.id.split(':')
@@ -28,7 +46,7 @@ const hook: Hook<'command_not_found'> = async function (opts) {
     }
   }
 
-  this.error(`command ${opts.id} not found`)
+  throw new Error(`command ${opts.id} not found`)
 }
 
 export default hook
