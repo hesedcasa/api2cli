@@ -1,5 +1,6 @@
 import {ux} from '@oclif/core'
 import {dereference} from '@scalar/openapi-parser'
+import {HttpsProxyAgent} from 'https-proxy-agent'
 import {load as yamlLoad} from 'js-yaml'
 import {existsSync} from 'node:fs'
 import {mkdir, readdir, readFile, unlink, writeFile} from 'node:fs/promises'
@@ -478,8 +479,154 @@ export async function readResponseBytes(res: FetchResponseLike): Promise<Buffer>
 // ─── Insecure fetch (skips TLS verification) ──────────────────────────────────
 
 /**
+ * Checks if a URL should bypass the proxy based on NO_PROXY/no_proxy env vars.
+ * NO_PROXY contains a comma-separated list of domains, IPs, or patterns.
+ * Matches follow curl behavior: each name matches as hostname OR domain suffix.
+ * Supports: exact matches, domain suffix matches, wildcard prefixes, and special values.
+ */
+export function shouldBypassProxy(targetUrl: string, noProxyList: string): boolean {
+  if (!noProxyList.trim()) return false
+
+  const target = new URL(targetUrl)
+  let targetHost = target.hostname
+  // Normalize IPv6: strip brackets from hostname (e.g., [::1] -> ::1)
+  // This allows NO_PROXY entries like "::1" to match URLs like "http://[::1]"
+  if (targetHost.startsWith('[') && targetHost.endsWith(']')) {
+    targetHost = targetHost.slice(1, -1)
+  }
+
+  // Normalize port: use default ports for empty URL.port
+  // URL.port is empty when the port is the scheme's default (80 for HTTP, 443 for HTTPS)
+  const targetPort = target.port || (target.protocol === 'https:' ? '443' : '80')
+
+  // Split NO_PROXY by commas and normalize to lowercase (URL.hostname is always lowercase)
+  const patterns = noProxyList.split(',').map(p => p.trim().toLowerCase()).filter(Boolean)
+
+  for (const pattern of patterns) {
+    // Special case: "*" means bypass all
+    if (pattern === '*') return true
+
+    // Parse port-qualified entries (e.g., "localhost:8080" or "[::1]:8080")
+    const colonIndex = pattern.lastIndexOf(':')
+    // Check if this looks like a port-qualified entry:
+    // - Part after last colon is all digits
+    // - Part before last colon either is bracketed OR contains no colons (not an IPv6 address)
+    const afterColon = colonIndex > 0 ? pattern.slice(colonIndex + 1) : ''
+    const beforeColon = colonIndex > 0 ? pattern.slice(0, colonIndex) : ''
+    const hasPort = colonIndex > 0 &&
+                    /^\d+$/.test(afterColon) &&
+                    (beforeColon.startsWith('[') || !beforeColon.includes(':'))
+    let patternHost = hasPort ? pattern.slice(0, colonIndex) : pattern
+    const patternPort = hasPort ? pattern.slice(colonIndex + 1) : undefined
+
+    // Normalize IPv6: strip brackets from pattern (e.g., [::1] -> ::1)
+    if (patternHost.startsWith('[') && patternHost.endsWith(']')) {
+      patternHost = patternHost.slice(1, -1)
+    }
+
+    // If pattern has a port, it must match the target's port
+    if (hasPort && targetPort !== patternPort) {
+      continue
+    }
+
+    // Wildcard prefix matching (e.g., *.example.com)
+    if (patternHost.startsWith('*.')) {
+      const domain = patternHost.slice(2) // Remove "*."
+      // Match domain and all subdomains
+      if (targetHost === domain || targetHost.endsWith('.' + domain)) {
+        return true
+      }
+    }
+    // Dot-prefixed matching (e.g., .example.com matches example.com and subdomains)
+    else if (patternHost.startsWith('.')) {
+      const domain = patternHost.slice(1) // Remove leading dot
+      // Match domain and all subdomains
+      if (targetHost === domain || targetHost.endsWith('.' + domain)) {
+        return true
+      }
+    }
+    // Standard NO_PROXY matching: matches hostname exactly OR as domain suffix
+    // Per curl behavior: "example.com" matches both "example.com" and "api.example.com"
+    else {
+      // Exact match
+      if (targetHost === patternHost) {
+        return true
+      }
+
+      // Domain suffix match (pattern is a suffix of hostname with a dot separator)
+      // This allows "example.com" to match "api.example.com"
+      if (targetHost.endsWith('.' + patternHost)) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+/**
+ * Returns the proxy URL from environment variables, if configured and not bypassed.
+ * Selects proxy based on target protocol: HTTP_PROXY for http: URLs, HTTPS_PROXY for https: URLs.
+ * Falls back to ALL_PROXY for both protocols. Respects NO_PROXY/no_proxy for bypass rules.
+ */
+export function getProxyUrl(targetUrl?: string): string | undefined {
+  let proxyUrl: string | undefined
+
+  // Select proxy variables based on target URL protocol
+  if (targetUrl) {
+    const { protocol } = new URL(targetUrl)
+    if (protocol === 'http:') {
+      // For HTTP: check HTTP_PROXY first, then ALL_PROXY
+      proxyUrl =
+        process.env.HTTP_PROXY ??
+        process.env.http_proxy ??
+        process.env.ALL_PROXY ??
+        process.env.all_proxy
+    } else if (protocol === 'https:') {
+      // For HTTPS: check HTTPS_PROXY first, then ALL_PROXY
+      proxyUrl =
+        process.env.HTTPS_PROXY ??
+        process.env.https_proxy ??
+        process.env.ALL_PROXY ??
+        process.env.all_proxy
+    } else {
+      // For other protocols or malformed URLs, check HTTPS_PROXY first (legacy fallback)
+      proxyUrl =
+        process.env.HTTPS_PROXY ??
+        process.env.https_proxy ??
+        process.env.HTTP_PROXY ??
+        process.env.http_proxy ??
+        process.env.ALL_PROXY ??
+        process.env.all_proxy
+    }
+  } else {
+    // No target URL provided: check HTTPS_PROXY first (legacy behavior for generic agent)
+    proxyUrl =
+      process.env.HTTPS_PROXY ??
+      process.env.https_proxy ??
+      process.env.HTTP_PROXY ??
+      process.env.http_proxy ??
+      process.env.ALL_PROXY ??
+      process.env.all_proxy
+  }
+
+  if (!proxyUrl) return undefined
+
+  // Check NO_PROXY bypass
+  const noProxy = process.env.NO_PROXY ?? process.env.no_proxy ?? ''
+  if (targetUrl && shouldBypassProxy(targetUrl, noProxy)) {
+    return undefined
+  }
+
+  return proxyUrl
+}
+
+/**
  * Returns a fetch-compatible function that skips TLS certificate verification.
  * Use for APIs that serve self-signed certificates (e.g. Obsidian Local REST API).
+ *
+ * When a proxy is configured via HTTPS_PROXY/HTTP_PROXY env vars, routes requests
+ * through it so Agent Vault's MITM proxy works correctly.
  */
 export function buildInsecureFetch(): FetchLike {
   return (url, init = {}) =>
@@ -487,8 +634,13 @@ export function buildInsecureFetch(): FetchLike {
       const u = new URL(url)
       const isHttps = u.protocol === 'https:'
       const mod = isHttps ? https : http
+
+      const proxyUrl = getProxyUrl(url)
+      const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl, {rejectUnauthorized: false}) : undefined
+
       const req = mod.request(
         {
+          agent,
           headers: init.headers,
           hostname: u.hostname,
           method: init.method ?? 'GET',
