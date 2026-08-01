@@ -453,6 +453,13 @@ describe('api-store', () => {
     it('ignores empty patterns', () => {
       expect(shouldBypassProxy('https://api.example.com', 'localhost,,example.com')).to.be.true
     })
+
+    it('normalizes mixed-case patterns to lowercase', () => {
+      expect(shouldBypassProxy('https://example.com', 'Example.COM')).to.be.true
+      expect(shouldBypassProxy('https://api.example.com', 'EXAMPLE.COM')).to.be.true
+      expect(shouldBypassProxy('https://sub.api.example.com', '*.EXAMPLE.COM')).to.be.true
+      expect(shouldBypassProxy('https://api.example.com', '.Example.COM')).to.be.true
+    })
   })
 
   describe('getProxyUrl', () => {

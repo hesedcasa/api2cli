@@ -490,8 +490,8 @@ export function shouldBypassProxy(targetUrl: string, noProxyList: string): boole
   const target = new URL(targetUrl)
   const targetHost = target.hostname
 
-  // Split NO_PROXY by commas and check each pattern
-  const patterns = noProxyList.split(',').map(p => p.trim()).filter(Boolean)
+  // Split NO_PROXY by commas and normalize to lowercase (URL.hostname is always lowercase)
+  const patterns = noProxyList.split(',').map(p => p.trim().toLowerCase()).filter(Boolean)
 
   for (const pattern of patterns) {
     // Special case: "*" means bypass all
