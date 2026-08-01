@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/hesedcasa/api2cli/compare/v0.4.1...v0.5.0) (2026-08-01)
+
+
+### 🎉 Features
+
+* add proxy support for insecure fetch ([#36](https://github.com/hesedcasa/api2cli/issues/36)) ([cb0f0f3](https://github.com/hesedcasa/api2cli/commit/cb0f0f3430a64fb5c63400a65de4b4b32c921d58))
+
 ## [0.4.1](https://github.com/hesedcasa/api2cli/compare/v0.4.0...v0.4.1) (2026-07-24)
 
 
