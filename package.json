@@ -17,7 +17,8 @@
     "@toon-format/toon": "^4.1.0",
     "graphql": "^16.13.2",
     "https-proxy-agent": "^9.1.0",
-    "js-yaml": "^5.2.1"
+    "js-yaml": "^5.2.1",
+    "proxy-from-env": "^2.1.0"
   },
   "devDependencies": {
     "@eslint/compat": "^2",
@@ -28,6 +29,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10",
     "@types/node": "^25",
+    "@types/proxy-from-env": "^1.0.4",
     "chai": "^6",
     "chai-as-promised": "^8.0.2",
     "eslint": "^9",
