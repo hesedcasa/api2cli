@@ -506,6 +506,31 @@ describe('api-store', () => {
       expect(shouldBypassProxy('https://sub.api.example.com:8080', '.example.com:8080')).to.be.true
       expect(shouldBypassProxy('https://api.example.com:9000', '.example.com:8080')).to.be.false
     })
+
+    it('handles IPv6 addresses with bracket normalization', () => {
+      // Unbracketed NO_PROXY entry should match bracketed IPv6 URL hostname
+      expect(shouldBypassProxy('http://[::1]:8080/health', '::1')).to.be.true
+      expect(shouldBypassProxy('http://[::1]/health', '::1')).to.be.true
+      expect(shouldBypassProxy('https://[::1]:443/api', '::1')).to.be.true
+
+      // Bracketed NO_PROXY entry should also match bracketed IPv6 URL
+      expect(shouldBypassProxy('http://[::1]:8080/health', '[::1]')).to.be.true
+      expect(shouldBypassProxy('http://[::1]/health', '[::1]')).to.be.true
+
+      // Port-qualified IPv6 entries
+      expect(shouldBypassProxy('http://[::1]:8080/health', '[::1]:8080')).to.be.true
+      expect(shouldBypassProxy('http://[::1]:9000/health', '[::1]:8080')).to.be.false
+
+      // Different IPv6 addresses
+      expect(shouldBypassProxy('http://[::2]:8080/health', '::1')).to.be.false
+      expect(shouldBypassProxy('http://[2001:db8::1]:443/api', '2001:db8::1')).to.be.true
+      expect(shouldBypassProxy('http://[2001:db8::1]:443/api', '[2001:db8::1]')).to.be.true
+
+      // IPv6 in multi-pattern list
+      expect(shouldBypassProxy('http://[::1]:8080/health', 'localhost,::1,example.com')).to.be.true
+      expect(shouldBypassProxy('http://[::1]:8080/health', 'localhost,[::1],example.com')).to.be.true
+      expect(shouldBypassProxy('http://[::1]:8080/health', 'localhost,[::1]:8080,example.com')).to.be.true
+    })
   })
 
   describe('getProxyUrl', () => {

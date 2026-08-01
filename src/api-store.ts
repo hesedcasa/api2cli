@@ -488,7 +488,13 @@ export function shouldBypassProxy(targetUrl: string, noProxyList: string): boole
   if (!noProxyList.trim()) return false
 
   const target = new URL(targetUrl)
-  const targetHost = target.hostname
+  let targetHost = target.hostname
+  // Normalize IPv6: strip brackets from hostname (e.g., [::1] -> ::1)
+  // This allows NO_PROXY entries like "::1" to match URLs like "http://[::1]"
+  if (targetHost.startsWith('[') && targetHost.endsWith(']')) {
+    targetHost = targetHost.slice(1, -1)
+  }
+
   // Normalize port: use default ports for empty URL.port
   // URL.port is empty when the port is the scheme's default (80 for HTTP, 443 for HTTPS)
   const targetPort = target.port || (target.protocol === 'https:' ? '443' : '80')
@@ -500,11 +506,23 @@ export function shouldBypassProxy(targetUrl: string, noProxyList: string): boole
     // Special case: "*" means bypass all
     if (pattern === '*') return true
 
-    // Parse port-qualified entries (e.g., "localhost:8080")
+    // Parse port-qualified entries (e.g., "localhost:8080" or "[::1]:8080")
     const colonIndex = pattern.lastIndexOf(':')
-    const hasPort = colonIndex > 0 && /^\d+$/.test(pattern.slice(colonIndex + 1))
-    const patternHost = hasPort ? pattern.slice(0, colonIndex) : pattern
+    // Check if this looks like a port-qualified entry:
+    // - Part after last colon is all digits
+    // - Part before last colon either is bracketed OR contains no colons (not an IPv6 address)
+    const afterColon = colonIndex > 0 ? pattern.slice(colonIndex + 1) : ''
+    const beforeColon = colonIndex > 0 ? pattern.slice(0, colonIndex) : ''
+    const hasPort = colonIndex > 0 &&
+                    /^\d+$/.test(afterColon) &&
+                    (beforeColon.startsWith('[') || !beforeColon.includes(':'))
+    let patternHost = hasPort ? pattern.slice(0, colonIndex) : pattern
     const patternPort = hasPort ? pattern.slice(colonIndex + 1) : undefined
+
+    // Normalize IPv6: strip brackets from pattern (e.g., [::1] -> ::1)
+    if (patternHost.startsWith('[') && patternHost.endsWith(']')) {
+      patternHost = patternHost.slice(1, -1)
+    }
 
     // If pattern has a port, it must match the target's port
     if (hasPort && targetPort !== patternPort) {
@@ -548,17 +566,49 @@ export function shouldBypassProxy(targetUrl: string, noProxyList: string): boole
 
 /**
  * Returns the proxy URL from environment variables, if configured and not bypassed.
- * Checks HTTPS_PROXY, HTTP_PROXY, ALL_PROXY (and their lowercase variants).
- * Respects NO_PROXY/no_proxy for destinations that should bypass the proxy.
+ * Selects proxy based on target protocol: HTTP_PROXY for http: URLs, HTTPS_PROXY for https: URLs.
+ * Falls back to ALL_PROXY for both protocols. Respects NO_PROXY/no_proxy for bypass rules.
  */
 export function getProxyUrl(targetUrl?: string): string | undefined {
-  const proxyUrl =
-    process.env.HTTPS_PROXY ??
-    process.env.https_proxy ??
-    process.env.HTTP_PROXY ??
-    process.env.http_proxy ??
-    process.env.ALL_PROXY ??
-    process.env.all_proxy
+  let proxyUrl: string | undefined
+
+  // Select proxy variables based on target URL protocol
+  if (targetUrl) {
+    const { protocol } = new URL(targetUrl)
+    if (protocol === 'http:') {
+      // For HTTP: check HTTP_PROXY first, then ALL_PROXY
+      proxyUrl =
+        process.env.HTTP_PROXY ??
+        process.env.http_proxy ??
+        process.env.ALL_PROXY ??
+        process.env.all_proxy
+    } else if (protocol === 'https:') {
+      // For HTTPS: check HTTPS_PROXY first, then ALL_PROXY
+      proxyUrl =
+        process.env.HTTPS_PROXY ??
+        process.env.https_proxy ??
+        process.env.ALL_PROXY ??
+        process.env.all_proxy
+    } else {
+      // For other protocols or malformed URLs, check HTTPS_PROXY first (legacy fallback)
+      proxyUrl =
+        process.env.HTTPS_PROXY ??
+        process.env.https_proxy ??
+        process.env.HTTP_PROXY ??
+        process.env.http_proxy ??
+        process.env.ALL_PROXY ??
+        process.env.all_proxy
+    }
+  } else {
+    // No target URL provided: check HTTPS_PROXY first (legacy behavior for generic agent)
+    proxyUrl =
+      process.env.HTTPS_PROXY ??
+      process.env.https_proxy ??
+      process.env.HTTP_PROXY ??
+      process.env.http_proxy ??
+      process.env.ALL_PROXY ??
+      process.env.all_proxy
+  }
 
   if (!proxyUrl) return undefined
 
