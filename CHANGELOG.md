@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/hesedcasa/api2cli/compare/v0.5.0...v0.5.1) (2026-08-01)
+
+
+### ♻️ Chores
+
+* use proxy-from-env and extract proxy module ([#38](https://github.com/hesedcasa/api2cli/issues/38)) ([dfdef05](https://github.com/hesedcasa/api2cli/commit/dfdef052fe36a73ecdb692c07ba8cb27b7709121))
+
 ## [0.5.0](https://github.com/hesedcasa/api2cli/compare/v0.4.1...v0.5.0) (2026-08-01)
 
 
