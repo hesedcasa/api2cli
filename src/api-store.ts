@@ -1,5 +1,6 @@
 import {ux} from '@oclif/core'
 import {dereference} from '@scalar/openapi-parser'
+import {HttpsProxyAgent} from 'https-proxy-agent'
 import {load as yamlLoad} from 'js-yaml'
 import {existsSync} from 'node:fs'
 import {mkdir, readdir, readFile, unlink, writeFile} from 'node:fs/promises'
@@ -478,8 +479,26 @@ export async function readResponseBytes(res: FetchResponseLike): Promise<Buffer>
 // ─── Insecure fetch (skips TLS verification) ──────────────────────────────────
 
 /**
+ * Returns the proxy URL from environment variables, if configured.
+ * Checks HTTPS_PROXY, HTTP_PROXY, ALL_PROXY (and their lowercase variants).
+ */
+function getProxyUrl(): string | undefined {
+  return (
+    process.env.HTTPS_PROXY ??
+    process.env.https_proxy ??
+    process.env.HTTP_PROXY ??
+    process.env.http_proxy ??
+    process.env.ALL_PROXY ??
+    process.env.all_proxy
+  )
+}
+
+/**
  * Returns a fetch-compatible function that skips TLS certificate verification.
  * Use for APIs that serve self-signed certificates (e.g. Obsidian Local REST API).
+ *
+ * When a proxy is configured via HTTPS_PROXY/HTTP_PROXY env vars, routes requests
+ * through it so Agent Vault's MITM proxy works correctly.
  */
 export function buildInsecureFetch(): FetchLike {
   return (url, init = {}) =>
@@ -487,8 +506,13 @@ export function buildInsecureFetch(): FetchLike {
       const u = new URL(url)
       const isHttps = u.protocol === 'https:'
       const mod = isHttps ? https : http
+
+      const proxyUrl = getProxyUrl()
+      const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl, {rejectUnauthorized: false}) : undefined
+
       const req = mod.request(
         {
+          agent,
           headers: init.headers,
           hostname: u.hostname,
           method: init.method ?? 'GET',

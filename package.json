@@ -16,6 +16,7 @@
     "@scalar/types": "^0.16.2",
     "@toon-format/toon": "^4.1.0",
     "graphql": "^16.13.2",
+    "https-proxy-agent": "^9.1.0",
     "js-yaml": "^5.2.1"
   },
   "devDependencies": {
@@ -24,9 +25,9 @@
     "@oclif/test": "^4",
     "@types/chai": "^5",
     "@types/chai-as-promised": "^8.0.2",
+    "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10",
     "@types/node": "^25",
-    "@types/js-yaml": "^4.0.9",
     "chai": "^6",
     "chai-as-promised": "^8.0.2",
     "eslint": "^9",
