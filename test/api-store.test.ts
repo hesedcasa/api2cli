@@ -11,8 +11,10 @@ import {
   deleteSpec,
   extractBaseUrl,
   extractOperations,
+  getProxyUrl,
   parseKV,
   readStore,
+  shouldBypassProxy,
   type StoredSpec,
   writeStore,
 } from '../src/api-store.js'
@@ -396,6 +398,134 @@ describe('api-store', () => {
       await writeFile(join(tmpDir, 'api-legacy.json'), JSON.stringify(modern))
       const store = await readStore(tmpDir)
       expect(store.specs.legacy.description).to.equal('modern')
+    })
+  })
+
+  // ─── Proxy NO_PROXY bypass ─────────────────────────────────────────────────────
+
+  describe('shouldBypassProxy', () => {
+    it('returns false for empty NO_PROXY list', () => {
+      expect(shouldBypassProxy('https://api.example.com', '')).to.be.false
+    })
+
+    it('returns true when NO_PROXY is "*" (bypass all)', () => {
+      expect(shouldBypassProxy('https://api.example.com', '*')).to.be.true
+    })
+
+    it('returns true for exact hostname match', () => {
+      expect(shouldBypassProxy('https://localhost:8080/api', 'localhost,example.com')).to.be.true
+      expect(shouldBypassProxy('https://api.example.com/v1', 'localhost,example.com')).to.be.true
+    })
+
+    it('returns false when hostname does not match', () => {
+      expect(shouldBypassProxy('https://api.example.com', 'localhost,other.com')).to.be.false
+    })
+
+    it('returns true for wildcard suffix match (*.example.com)', () => {
+      expect(shouldBypassProxy('https://api.example.com', '*.example.com')).to.be.true
+      expect(shouldBypassProxy('https://sub.api.example.com', '*.example.com')).to.be.true
+      expect(shouldBypassProxy('https://example.com', '*.example.com')).to.be.true
+    })
+
+    it('returns false for wildcard non-match', () => {
+      expect(shouldBypassProxy('https://api.other.com', '*.example.com')).to.be.false
+    })
+
+    it('returns true for dot-prefix match (.example.com)', () => {
+      expect(shouldBypassProxy('https://api.example.com', '.example.com')).to.be.true
+      expect(shouldBypassProxy('https://sub.api.example.com', '.example.com')).to.be.true
+      expect(shouldBypassProxy('https://example.com', '.example.com')).to.be.true
+    })
+
+    it('handles multiple patterns in NO_PROXY', () => {
+      const noProxy = 'localhost,127.0.0.1,*.internal,*.example.com'
+      expect(shouldBypassProxy('https://localhost', noProxy)).to.be.true
+      expect(shouldBypassProxy('https://127.0.0.1:8080', noProxy)).to.be.true
+      expect(shouldBypassProxy('https://service.internal', noProxy)).to.be.true
+      expect(shouldBypassProxy('https://api.example.com', noProxy)).to.be.true
+      expect(shouldBypassProxy('https://external.com', noProxy)).to.be.false
+    })
+
+    it('trims whitespace around patterns', () => {
+      expect(shouldBypassProxy('https://api.example.com', 'localhost, example.com, other.com')).to.be.true
+    })
+
+    it('ignores empty patterns', () => {
+      expect(shouldBypassProxy('https://api.example.com', 'localhost,,example.com')).to.be.true
+    })
+  })
+
+  describe('getProxyUrl', () => {
+    const originalEnv = process.env
+
+    beforeEach(() => {
+      // Reset environment for each test
+      process.env = {...originalEnv}
+    })
+
+    afterEach(() => {
+      process.env = originalEnv
+    })
+
+    it('returns undefined when no proxy env vars are set', () => {
+      delete process.env.HTTPS_PROXY
+      delete process.env.https_proxy
+      delete process.env.HTTP_PROXY
+      delete process.env.http_proxy
+      delete process.env.ALL_PROXY
+      delete process.env.all_proxy
+      expect(getProxyUrl('https://api.example.com')).to.be.undefined
+    })
+
+    it('returns proxy URL when HTTPS_PROXY is set', () => {
+      process.env.HTTPS_PROXY = 'http://proxy.example.com:8080'
+      expect(getProxyUrl('https://api.example.com')).to.equal('http://proxy.example.com:8080')
+    })
+
+    it('returns proxy URL when HTTP_PROXY is set', () => {
+      process.env.HTTP_PROXY = 'http://proxy.example.com:8080'
+      expect(getProxyUrl('http://api.example.com')).to.equal('http://proxy.example.com:8080')
+    })
+
+    it('returns undefined when NO_PROXY matches the target URL', () => {
+      process.env.HTTPS_PROXY = 'http://proxy.example.com:8080'
+      process.env.NO_PROXY = 'localhost,example.com,*.internal'
+      expect(getProxyUrl('https://localhost:8080/api')).to.be.undefined
+      expect(getProxyUrl('https://api.example.com')).to.be.undefined
+      expect(getProxyUrl('https://service.internal')).to.be.undefined
+    })
+
+    it('returns proxy URL when NO_PROXY does not match the target URL', () => {
+      process.env.HTTPS_PROXY = 'http://proxy.example.com:8080'
+      process.env.NO_PROXY = 'localhost,example.com'
+      expect(getProxyUrl('https://other.com')).to.equal('http://proxy.example.com:8080')
+    })
+
+    it('returns proxy URL when NO_PROXY is empty', () => {
+      process.env.HTTPS_PROXY = 'http://proxy.example.com:8080'
+      process.env.NO_PROXY = ''
+      expect(getProxyUrl('https://api.example.com')).to.equal('http://proxy.example.com:8080')
+    })
+
+    it('respects lowercase no_proxy variant', () => {
+      process.env.HTTPS_PROXY = 'http://proxy.example.com:8080'
+      // eslint-disable-next-line camelcase
+      process.env.no_proxy = 'localhost,example.com'
+      expect(getProxyUrl('https://localhost')).to.be.undefined
+    })
+
+    it('prefers NO_PROXY over no_proxy', () => {
+      process.env.HTTPS_PROXY = 'http://proxy.example.com:8080'
+      process.env.NO_PROXY = 'example.com'
+      // eslint-disable-next-line camelcase
+      process.env.no_proxy = 'other.com'
+      expect(getProxyUrl('https://example.com')).to.be.undefined
+      expect(getProxyUrl('https://other.com')).to.equal('http://proxy.example.com:8080')
+    })
+
+    it('returns proxy URL when target URL is not provided', () => {
+      process.env.HTTPS_PROXY = 'http://proxy.example.com:8080'
+      expect(getProxyUrl()).to.equal('http://proxy.example.com:8080')
     })
   })
 })

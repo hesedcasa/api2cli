@@ -479,18 +479,82 @@ export async function readResponseBytes(res: FetchResponseLike): Promise<Buffer>
 // ─── Insecure fetch (skips TLS verification) ──────────────────────────────────
 
 /**
- * Returns the proxy URL from environment variables, if configured.
- * Checks HTTPS_PROXY, HTTP_PROXY, ALL_PROXY (and their lowercase variants).
+ * Checks if a URL should bypass the proxy based on NO_PROXY/no_proxy env vars.
+ * NO_PROXY contains a comma-separated list of domains, IPs, or patterns.
+ * Matches follow curl behavior: each name matches as hostname OR domain suffix.
+ * Supports: exact matches, domain suffix matches, wildcard prefixes, and special values.
  */
-function getProxyUrl(): string | undefined {
-  return (
+export function shouldBypassProxy(targetUrl: string, noProxyList: string): boolean {
+  if (!noProxyList.trim()) return false
+
+  const target = new URL(targetUrl)
+  const targetHost = target.hostname
+
+  // Split NO_PROXY by commas and check each pattern
+  const patterns = noProxyList.split(',').map(p => p.trim()).filter(Boolean)
+
+  for (const pattern of patterns) {
+    // Special case: "*" means bypass all
+    if (pattern === '*') return true
+
+    // Wildcard prefix matching (e.g., *.example.com)
+    if (pattern.startsWith('*.')) {
+      const domain = pattern.slice(2) // Remove "*."
+      // Match domain and all subdomains
+      if (targetHost === domain || targetHost.endsWith('.' + domain)) {
+        return true
+      }
+    }
+    // Dot-prefixed matching (e.g., .example.com matches example.com and subdomains)
+    else if (pattern.startsWith('.')) {
+      const domain = pattern.slice(1) // Remove leading dot
+      // Match domain and all subdomains
+      if (targetHost === domain || targetHost.endsWith('.' + domain)) {
+        return true
+      }
+    }
+    // Standard NO_PROXY matching: matches hostname exactly OR as domain suffix
+    // Per curl behavior: "example.com" matches both "example.com" and "api.example.com"
+    else {
+      // Exact match
+      if (targetHost === pattern) {
+        return true
+      }
+
+      // Domain suffix match (pattern is a suffix of hostname with a dot separator)
+      // This allows "example.com" to match "api.example.com"
+      if (targetHost.endsWith('.' + pattern)) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+/**
+ * Returns the proxy URL from environment variables, if configured and not bypassed.
+ * Checks HTTPS_PROXY, HTTP_PROXY, ALL_PROXY (and their lowercase variants).
+ * Respects NO_PROXY/no_proxy for destinations that should bypass the proxy.
+ */
+export function getProxyUrl(targetUrl?: string): string | undefined {
+  const proxyUrl =
     process.env.HTTPS_PROXY ??
     process.env.https_proxy ??
     process.env.HTTP_PROXY ??
     process.env.http_proxy ??
     process.env.ALL_PROXY ??
     process.env.all_proxy
-  )
+
+  if (!proxyUrl) return undefined
+
+  // Check NO_PROXY bypass
+  const noProxy = process.env.NO_PROXY ?? process.env.no_proxy ?? ''
+  if (targetUrl && shouldBypassProxy(targetUrl, noProxy)) {
+    return undefined
+  }
+
+  return proxyUrl
 }
 
 /**
@@ -507,7 +571,7 @@ export function buildInsecureFetch(): FetchLike {
       const isHttps = u.protocol === 'https:'
       const mod = isHttps ? https : http
 
-      const proxyUrl = getProxyUrl()
+      const proxyUrl = getProxyUrl(url)
       const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl, {rejectUnauthorized: false}) : undefined
 
       const req = mod.request(
