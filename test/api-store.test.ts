@@ -460,6 +460,41 @@ describe('api-store', () => {
       expect(shouldBypassProxy('https://sub.api.example.com', '*.EXAMPLE.COM')).to.be.true
       expect(shouldBypassProxy('https://api.example.com', '.Example.COM')).to.be.true
     })
+
+    it('bypasses proxy for port-qualified NO_PROXY entries when port matches', () => {
+      expect(shouldBypassProxy('https://localhost:8080', 'localhost:8080')).to.be.true
+      expect(shouldBypassProxy('https://localhost:8080/api', 'localhost:8080')).to.be.true
+      expect(shouldBypassProxy('http://localhost:3000', 'localhost:3000')).to.be.true
+    })
+
+    it('does not bypass proxy for port-qualified NO_PROXY entries when port differs', () => {
+      expect(shouldBypassProxy('https://localhost:8080', 'localhost:3000')).to.be.false
+      expect(shouldBypassProxy('https://localhost:8080', 'localhost:9000')).to.be.false
+      expect(shouldBypassProxy('https://example.com:443', 'example.com:8080')).to.be.false
+    })
+
+    it('hostname-only NO_PROXY entries match any port', () => {
+      expect(shouldBypassProxy('https://localhost:8080', 'localhost')).to.be.true
+      expect(shouldBypassProxy('https://localhost:3000', 'localhost')).to.be.true
+      expect(shouldBypassProxy('https://localhost', 'localhost')).to.be.true
+    })
+
+    it('handles mixed port-qualified and hostname-only entries', () => {
+      const noProxy = 'localhost:8080,example.com,api.test.com:3000'
+      expect(shouldBypassProxy('https://localhost:8080', noProxy)).to.be.true
+      expect(shouldBypassProxy('https://localhost:9000', noProxy)).to.be.false
+      expect(shouldBypassProxy('https://example.com:443', noProxy)).to.be.true
+      expect(shouldBypassProxy('https://api.test.com:3000', noProxy)).to.be.true
+      expect(shouldBypassProxy('https://api.test.com:4000', noProxy)).to.be.false
+    })
+
+    it('port-qualified wildcard and dot-prefix patterns match port', () => {
+      expect(shouldBypassProxy('https://api.example.com:8080', '*.example.com:8080')).to.be.true
+      expect(shouldBypassProxy('https://api.example.com:9000', '*.example.com:8080')).to.be.false
+      expect(shouldBypassProxy('https://api.example.com:8080', '.example.com:8080')).to.be.true
+      expect(shouldBypassProxy('https://sub.api.example.com:8080', '.example.com:8080')).to.be.true
+      expect(shouldBypassProxy('https://api.example.com:9000', '.example.com:8080')).to.be.false
+    })
   })
 
   describe('getProxyUrl', () => {

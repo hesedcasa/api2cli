@@ -489,6 +489,7 @@ export function shouldBypassProxy(targetUrl: string, noProxyList: string): boole
 
   const target = new URL(targetUrl)
   const targetHost = target.hostname
+  const targetPort = target.port
 
   // Split NO_PROXY by commas and normalize to lowercase (URL.hostname is always lowercase)
   const patterns = noProxyList.split(',').map(p => p.trim().toLowerCase()).filter(Boolean)
@@ -497,17 +498,28 @@ export function shouldBypassProxy(targetUrl: string, noProxyList: string): boole
     // Special case: "*" means bypass all
     if (pattern === '*') return true
 
+    // Parse port-qualified entries (e.g., "localhost:8080")
+    const colonIndex = pattern.lastIndexOf(':')
+    const hasPort = colonIndex > 0 && /^\d+$/.test(pattern.slice(colonIndex + 1))
+    const patternHost = hasPort ? pattern.slice(0, colonIndex) : pattern
+    const patternPort = hasPort ? pattern.slice(colonIndex + 1) : undefined
+
+    // If pattern has a port, it must match the target's port
+    if (hasPort && targetPort !== patternPort) {
+      continue
+    }
+
     // Wildcard prefix matching (e.g., *.example.com)
-    if (pattern.startsWith('*.')) {
-      const domain = pattern.slice(2) // Remove "*."
+    if (patternHost.startsWith('*.')) {
+      const domain = patternHost.slice(2) // Remove "*."
       // Match domain and all subdomains
       if (targetHost === domain || targetHost.endsWith('.' + domain)) {
         return true
       }
     }
     // Dot-prefixed matching (e.g., .example.com matches example.com and subdomains)
-    else if (pattern.startsWith('.')) {
-      const domain = pattern.slice(1) // Remove leading dot
+    else if (patternHost.startsWith('.')) {
+      const domain = patternHost.slice(1) // Remove leading dot
       // Match domain and all subdomains
       if (targetHost === domain || targetHost.endsWith('.' + domain)) {
         return true
@@ -517,13 +529,13 @@ export function shouldBypassProxy(targetUrl: string, noProxyList: string): boole
     // Per curl behavior: "example.com" matches both "example.com" and "api.example.com"
     else {
       // Exact match
-      if (targetHost === pattern) {
+      if (targetHost === patternHost) {
         return true
       }
 
       // Domain suffix match (pattern is a suffix of hostname with a dot separator)
       // This allows "example.com" to match "api.example.com"
-      if (targetHost.endsWith('.' + pattern)) {
+      if (targetHost.endsWith('.' + patternHost)) {
         return true
       }
     }
