@@ -473,6 +473,17 @@ describe('api-store', () => {
       expect(shouldBypassProxy('https://example.com:443', 'example.com:8080')).to.be.false
     })
 
+    it('matches port-qualified NO_PROXY entries against URLs with omitted default ports', () => {
+      // HTTPS default port (443) - with suffix matching behavior
+      expect(shouldBypassProxy('https://example.com', 'example.com:443')).to.be.true
+      expect(shouldBypassProxy('https://api.example.com', 'example.com:443')).to.be.true // suffix match
+      expect(shouldBypassProxy('https://example.com:443', 'example.com:443')).to.be.true
+      // HTTP default port (80) - with suffix matching behavior
+      expect(shouldBypassProxy('http://example.com', 'example.com:80')).to.be.true
+      expect(shouldBypassProxy('http://api.example.com', 'example.com:80')).to.be.true // suffix match
+      expect(shouldBypassProxy('http://example.com:80', 'example.com:80')).to.be.true
+    })
+
     it('hostname-only NO_PROXY entries match any port', () => {
       expect(shouldBypassProxy('https://localhost:8080', 'localhost')).to.be.true
       expect(shouldBypassProxy('https://localhost:3000', 'localhost')).to.be.true

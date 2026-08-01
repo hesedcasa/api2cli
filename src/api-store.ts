@@ -489,7 +489,9 @@ export function shouldBypassProxy(targetUrl: string, noProxyList: string): boole
 
   const target = new URL(targetUrl)
   const targetHost = target.hostname
-  const targetPort = target.port
+  // Normalize port: use default ports for empty URL.port
+  // URL.port is empty when the port is the scheme's default (80 for HTTP, 443 for HTTPS)
+  const targetPort = target.port || (target.protocol === 'https:' ? '443' : '80')
 
   // Split NO_PROXY by commas and normalize to lowercase (URL.hostname is always lowercase)
   const patterns = noProxyList.split(',').map(p => p.trim().toLowerCase()).filter(Boolean)
