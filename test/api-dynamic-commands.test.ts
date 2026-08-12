@@ -13,7 +13,7 @@ import {makeFetch, makeOperation, makeSpec, seedStore} from './helpers.js'
 
 // ─── Internal config shape for tests ─────────────────────────────────────────
 
-interface TestConfig {
+type TestConfig = {
   _commands: Map<string, {description?: string; id: string; load: () => Promise<unknown>}>
   _topics: Map<string, {description?: string; hidden: boolean; name: string}>
   bin: string
@@ -58,8 +58,14 @@ async function buildDynamicCmd(tmpDir: string, op: ReturnType<typeof makeOperati
   const logs: string[] = []
   const warns: string[] = []
   let cliError: Error | undefined
-  cmd.log = (msg?: string) => logs.push(msg ?? '')
-  cmd.warn = (input: Error | string) => warns.push(typeof input === 'string' ? input : input.message)
+  cmd.log = (msg?: string) => {
+    logs.push(msg ?? '')
+  }
+
+  cmd.warn = (input: Error | string) => {
+    warns.push(typeof input === 'string' ? input : input.message)
+  }
+
   cmd.error = (input: Error | string) => {
     const msg = typeof input === 'string' ? input : input.message
     cliError = new Error(msg)

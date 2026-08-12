@@ -29,6 +29,7 @@ export default class ApiCall extends Command {
       required: true,
     }),
   }
+
   static description = 'Call an imported API operation'
   static examples = [
     '<%= config.bin %> api call petstore listPets',
@@ -36,6 +37,7 @@ export default class ApiCall extends Command {
     '<%= config.bin %> api call petstore createPet --body name=Fido --body tag=dog',
     '<%= config.bin %> api call petstore listPets --query limit=10 --header X-Trace=abc',
   ]
+
   static flags = {
     'base-url': Flags.string({
       description: 'Override the base URL for this request',
@@ -76,10 +78,10 @@ export default class ApiCall extends Command {
       required: false,
     }),
   }
+
   // Exposed for testing — inject a mock to avoid encoding in unit tests
   _applyToon: (value: unknown) => string = encode
   // Exposed for testing — inject a mock implementation to avoid real HTTP calls
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
   _fetch: FetchLike = fetch
 
   // eslint-disable-next-line complexity
@@ -142,7 +144,7 @@ export default class ApiCall extends Command {
     // ── Build headers ──────────────────────────────────────────────────────────
     // parsedHeaders (from --header) take priority — they can override the inferred Content-Type.
     const headers: Record<string, string> = {
-      ...(auth ? buildAuthHeaders(auth) : {}),
+      ...(auth && buildAuthHeaders(auth)),
       ...headerParams,
     }
     if (hasBody && !parsedHeaders['Content-Type']) {
@@ -155,7 +157,7 @@ export default class ApiCall extends Command {
     const method = operation.method.toUpperCase()
     const reqInit = {body: requestBody, headers, method}
 
-    this.log(`${method} ${url.toString()}`)
+    this.log(`${method} ${url.href}`)
 
     // A spinner (on stderr, so piped stdout stays clean) reassures the user
     // while the request is in flight — downloads to a file can be large
@@ -163,7 +165,7 @@ export default class ApiCall extends Command {
     startSpinner(flags.output ? `Downloading to ${flags.output}` : `${method} request`)
 
     const fetchFn = spec.insecure ? buildInsecureFetch() : this._fetch
-    const res = await fetchFn(url.toString(), reqInit).catch((error: Error) => {
+    const res = await fetchFn(url.href, reqInit).catch((error: Error) => {
       stopSpinner('failed')
       this.error(`Request failed: ${error.message}`)
     })
@@ -222,6 +224,11 @@ export default class ApiCall extends Command {
       }
 
       switch (p.in) {
+        // Cookie params are not supported by the CLI — ignore them.
+        case 'cookie': {
+          break
+        }
+
         case 'header': {
           headerParams[p.name] = value
           break
@@ -236,7 +243,6 @@ export default class ApiCall extends Command {
           queryParams[p.name] = value
           break
         }
-        // No default — cookie params are ignored
       }
     }
 

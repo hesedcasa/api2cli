@@ -30,7 +30,7 @@ describe('isPostmanCollection', () => {
   })
 
   it('returns true when info has _postman_id string', () => {
-    const col = {info: {_postman_id: 'abc-123', name: 'My Collection'}} // eslint-disable-line camelcase
+    const col = {info: {_postman_id: 'abc-123', name: 'My Collection'}}
     expect(isPostmanCollection(col)).to.be.true
   })
 

@@ -7,6 +7,7 @@ export default class AuthDelete extends Command {
   static args = {
     api: Args.string({description: 'API name', required: true}),
   }
+
   static description = 'Delete an auth profile for an imported API'
   static examples = ['<%= config.bin %> api auth delete petstore', '<%= config.bin %> api auth delete petstore -p prod']
   static flags = {
@@ -26,7 +27,7 @@ export default class AuthDelete extends Command {
 
     let profiles: Record<string, AuthScheme>
     try {
-      profiles = (await pm.readProfiles()) as Record<string, AuthScheme>
+      profiles = await pm.readProfiles()
     } catch {
       this.error(`No auth profiles found for "${args.api}".`)
     }

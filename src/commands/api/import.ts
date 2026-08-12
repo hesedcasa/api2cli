@@ -30,8 +30,10 @@ export default class ApiImport extends Command {
       required: true,
     }),
   }
+
   static description =
     'Import an OpenAPI spec, Postman collection, or GraphQL schema (SDL/introspection/endpoint) and register its operations as commands'
+
   static examples = [
     '<%= config.bin %> api import ./petstore.json  --name petstore',
     '<%= config.bin %> api import ./postman_collection.json --name myapi',
@@ -42,6 +44,7 @@ export default class ApiImport extends Command {
     '<%= config.bin %> api import ./api.yaml --auth-type apikey --api-key mykey --api-key-header X-API-Key',
     '<%= config.bin %> api import ./api.yaml --auth-type basic --username user --password pass',
   ]
+
   static flags = {
     'api-key': Flags.string({
       description: 'API key value (used with --auth-type apikey)',
@@ -147,9 +150,9 @@ export default class ApiImport extends Command {
 
     if (auth.type !== 'none') {
       const pm = createApiAuthManager(this.config, nameSlug)
-      let existing: Record<string, import('../../api-store.js').AuthScheme> = {}
+      let existing: Record<string, AuthScheme> = {}
       try {
-        existing = (await pm.readProfiles()) as typeof existing
+        existing = await pm.readProfiles()
       } catch {}
 
       await pm.saveProfiles({...existing, default: auth})

@@ -10,12 +10,14 @@ export default class ApiConfig extends Command {
       required: true,
     }),
   }
+
   static description = 'Update configuration for an imported API spec'
   static examples = [
     '<%= config.bin %> api config petstore --base-url https://api.example.com',
     '<%= config.bin %> api config petstore --rename mystore',
     '<%= config.bin %> api config petstore --title "My Petstore" --description "A pet store API"',
   ]
+
   static flags = {
     'base-url': Flags.string({
       description: 'New base URL for API calls',

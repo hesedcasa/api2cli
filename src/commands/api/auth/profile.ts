@@ -7,11 +7,13 @@ export default class AuthProfile extends Command {
   static args = {
     api: Args.string({description: 'API name', required: true}),
   }
+
   static description = 'Get or set the default auth profile for an imported API'
   static examples = [
     '<%= config.bin %> api auth profile petstore',
     '<%= config.bin %> api auth profile petstore --default prod',
   ]
+
   static flags = {
     default: Flags.string({description: 'Profile to set as default', required: false}),
   }
