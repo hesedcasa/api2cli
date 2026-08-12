@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/hesedcasa/api2cli/compare/v0.5.1...v0.5.2) (2026-08-12)
+
+
+### ♻️ Chores
+
+* upgrade ESLint to v10 and eslint-config-oclif to v7 ([#43](https://github.com/hesedcasa/api2cli/issues/43)) ([8d0e02e](https://github.com/hesedcasa/api2cli/commit/8d0e02edcf9ed87702cc33eeb303e807bdefa3b8))
+
 ## [0.5.1](https://github.com/hesedcasa/api2cli/compare/v0.5.0...v0.5.1) (2026-08-01)
 
 
