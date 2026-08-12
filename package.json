@@ -15,7 +15,7 @@
     "@scalar/postman-to-openapi": "^0.7.8",
     "@scalar/types": "^0.16.2",
     "@toon-format/toon": "^4.1.0",
-    "graphql": "^16.13.2",
+    "graphql": "^17.0.2",
     "https-proxy-agent": "^9.1.0",
     "js-yaml": "^5.2.1",
     "proxy-from-env": "^2.1.0"
