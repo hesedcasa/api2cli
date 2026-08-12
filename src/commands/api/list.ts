@@ -10,6 +10,7 @@ export default class ApiList extends Command {
       required: false,
     }),
   }
+
   static description = 'List imported API specs and their available operations'
   static examples = ['<%= config.bin %> api list', '<%= config.bin %> api list petstore']
 

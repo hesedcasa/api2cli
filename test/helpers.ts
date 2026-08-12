@@ -1,5 +1,7 @@
 import type {Config} from '@oclif/core'
 
+import {Buffer} from 'node:buffer'
+
 import {type FetchLike, type StoredOperation, type StoredSpec, writeStore} from '../src/api-store.js'
 
 // ─── Config mock ──────────────────────────────────────────────────────────────
@@ -18,7 +20,7 @@ export function makeConfig(configDir: string): Config {
 
 // ─── Command runner ───────────────────────────────────────────────────────────
 
-export interface RunResult {
+export type RunResult = {
   cliError: Error | undefined
   logs: string[]
   warns: string[]
@@ -35,8 +37,14 @@ export async function runCmd<T extends object>(
   const warns: string[] = []
   let cliError: Error | undefined
 
-  cmd.log = (msg?: string) => logs.push(msg ?? '')
-  cmd.warn = (input: Error | string) => warns.push(typeof input === 'string' ? input : input.message)
+  cmd.log = (msg?: string) => {
+    logs.push(msg ?? '')
+  }
+
+  cmd.warn = (input: Error | string) => {
+    warns.push(typeof input === 'string' ? input : input.message)
+  }
+
   cmd.error = (input: Error | string) => {
     const msg = typeof input === 'string' ? input : input.message
     const err = Object.assign(new Error(msg), {oclif: {exit: 2}})

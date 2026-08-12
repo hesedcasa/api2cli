@@ -24,7 +24,7 @@ export async function loadApiAuthConfig(
   const pm = createApiAuthManager(config, apiName, profile)
   let profiles: Record<string, AuthScheme>
   try {
-    profiles = (await pm.readProfiles()) as Record<string, AuthScheme>
+    profiles = await pm.readProfiles()
   } catch {
     throw new Error(`Profile '${profile}' does not exist for "${apiName}".`)
   }

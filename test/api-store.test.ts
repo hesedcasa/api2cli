@@ -1,4 +1,5 @@
 import {expect} from 'chai'
+import {Buffer} from 'node:buffer'
 import {mkdtemp, rm, writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'

@@ -5,7 +5,7 @@ import {
   type GraphQLArgument,
   type GraphQLField,
   type GraphQLInputType,
-  GraphQLObjectType,
+  type GraphQLObjectType,
   type GraphQLOutputType,
   type GraphQLSchema,
   type IntrospectionQuery,
@@ -47,7 +47,7 @@ export function isIntrospectionPayload(parsed: unknown): boolean {
 
 // ─── Schema loading ──────────────────────────────────────────────────────────
 
-interface LoadOptions {
+type LoadOptions = {
   /** Extra headers used when POSTing the introspection query to a live endpoint. */
   headers?: Record<string, string>
 }
@@ -59,7 +59,6 @@ interface LoadOptions {
 export async function loadGraphQLSchema(source: string, opts: LoadOptions = {}): Promise<GraphQLSchema> {
   if (source.startsWith('http://') || source.startsWith('https://')) {
     if (hasGraphQLExtension(new URL(source).pathname)) {
-      // eslint-disable-next-line n/no-unsupported-features/node-builtins
       const res = await fetch(source, {headers: opts.headers})
       if (!res.ok) throw new Error(`HTTP ${res.status} fetching GraphQL SDL from ${source}`)
       return parseSchemaSource(await res.text())
@@ -89,7 +88,6 @@ export function parseSchemaSource(raw: string): GraphQLSchema {
 }
 
 async function fetchIntrospection(endpoint: string, headers: Record<string, string> = {}): Promise<GraphQLSchema> {
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
   const res = await fetch(endpoint, {
     body: JSON.stringify({query: getIntrospectionQuery()}),
     headers: {'Content-Type': 'application/json', ...headers},
@@ -110,26 +108,26 @@ async function fetchIntrospection(endpoint: string, headers: Record<string, stri
 // ─── Type helpers ────────────────────────────────────────────────────────────
 
 function unwrapInput(type: GraphQLInputType): GraphQLInputType {
-  if (isNonNullType(type)) return unwrapInput(type.ofType as GraphQLInputType)
-  if (isListType(type)) return unwrapInput(type.ofType as GraphQLInputType)
+  if (isNonNullType(type)) return unwrapInput(type.ofType)
+  if (isListType(type)) return unwrapInput(type.ofType)
   return type
 }
 
 function unwrapOutput(type: GraphQLOutputType): GraphQLOutputType {
   if (isNonNullType(type)) return unwrapOutput(type.ofType as GraphQLOutputType)
-  if (isListType(type)) return unwrapOutput(type.ofType as GraphQLOutputType)
+  if (isListType(type)) return unwrapOutput(type.ofType)
   return type
 }
 
 function formatTypeRef(type: GraphQLInputType | GraphQLOutputType): string {
   if (isNonNullType(type)) return `${formatTypeRef(type.ofType as GraphQLInputType | GraphQLOutputType)}!`
-  if (isListType(type)) return `[${formatTypeRef(type.ofType as GraphQLInputType | GraphQLOutputType)}]`
+  if (isListType(type)) return `[${formatTypeRef(type.ofType)}]`
   return type.name
 }
 
 function isListOrWrappedList(type: GraphQLInputType): boolean {
   if (isListType(type)) return true
-  if (isNonNullType(type)) return isListOrWrappedList(type.ofType as GraphQLInputType)
+  if (isNonNullType(type)) return isListOrWrappedList(type.ofType)
   return false
 }
 
@@ -228,8 +226,8 @@ function capitalize(input: string): string {
   return input.length === 0 ? input : input[0].toUpperCase() + input.slice(1)
 }
 
-interface BuildDocumentInput {
-  args: ReadonlyArray<GraphQLArgument>
+type BuildDocumentInput = {
+  args: readonly GraphQLArgument[]
   fieldName: string
   maxDepth: number
   operationName: string
@@ -248,13 +246,13 @@ function buildOperationDocument(input: BuildDocumentInput): string {
 
 // ─── Main conversion ─────────────────────────────────────────────────────────
 
-interface GraphQLImportResult {
+type GraphQLImportResult = {
   description?: string
   operations: StoredOperation[]
   title: string
 }
 
-interface ConvertOptions {
+type ConvertOptions = {
   description?: string
   /** Depth limit for auto-generated selection sets. Defaults to 3. */
   selectionDepth?: number

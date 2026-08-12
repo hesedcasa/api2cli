@@ -1,20 +1,19 @@
 import {ux} from '@oclif/core'
 import {dereference} from '@scalar/openapi-parser'
 import {load as yamlLoad} from 'js-yaml'
+import {Buffer} from 'node:buffer'
 import {existsSync} from 'node:fs'
 import {mkdir, readdir, readFile, unlink, writeFile} from 'node:fs/promises'
 import http from 'node:http'
 import https from 'node:https'
 import {join} from 'node:path'
 
-import type {PostmanCollection} from './postman-converter.js'
-
-import {isPostmanCollection, postmanToOpenApi} from './postman-converter.js'
+import {isPostmanCollection, type PostmanCollection, postmanToOpenApi} from './postman-converter.js'
 import {buildProxyAgent} from './proxy.js'
 
 // ─── OpenAPI types ────────────────────────────────────────────────────────────
 
-interface OpenApiParameter {
+type OpenApiParameter = {
   description?: string
   in: 'cookie' | 'header' | 'path' | 'query'
   name: string
@@ -22,23 +21,23 @@ interface OpenApiParameter {
   schema?: {enum?: string[]; type?: string}
 }
 
-interface OpenApiMediaType {
+type OpenApiMediaType = {
   schema?: OpenApiSchema
 }
 
-interface OpenApiRequestBody {
+type OpenApiRequestBody = {
   content?: Record<string, OpenApiMediaType>
   required?: boolean
 }
 
-interface OpenApiSchema {
+type OpenApiSchema = {
   description?: string
   properties?: Record<string, OpenApiSchemaProperty>
   required?: string[]
   type?: string
 }
 
-interface OpenApiSchemaProperty {
+type OpenApiSchemaProperty = {
   allOf?: OpenApiSchemaProperty[]
   anyOf?: OpenApiSchemaProperty[]
   description?: string
@@ -49,7 +48,7 @@ interface OpenApiSchemaProperty {
   type?: string
 }
 
-interface OpenApiOperation {
+type OpenApiOperation = {
   description?: string
   operationId?: string
   parameters?: OpenApiParameter[]
@@ -58,18 +57,14 @@ interface OpenApiOperation {
   tags?: string[]
 }
 
-interface OpenApiPaths {
-  [path: string]: {
-    [method: string]: OpenApiOperation
-  }
-}
+type OpenApiPaths = Record<string, Record<string, OpenApiOperation>>
 
-interface OpenApiComponents {
+type OpenApiComponents = {
   parameters?: Record<string, OpenApiParameter>
   schemas?: Record<string, OpenApiSchema>
 }
 
-interface OpenApiSpec {
+type OpenApiSpec = {
   components?: OpenApiComponents
   info?: {description?: string; title?: string; version?: string}
   openapi?: string
@@ -86,13 +81,13 @@ export type AuthScheme =
   | {baseUrl?: string; scheme: 'bearer'; token: string; type: 'http'}
   | {baseUrl?: string; type: 'none'}
 
-interface BodyParam {
+type BodyParam = {
   description?: string
   required: boolean
   type: string
 }
 
-interface GraphQLOperationMeta {
+type GraphQLOperationMeta = {
   fieldName: string
   operationType: 'mutation' | 'query'
   /**
@@ -102,7 +97,7 @@ interface GraphQLOperationMeta {
   query: string
 }
 
-export interface StoredOperation {
+export type StoredOperation = {
   bodyParams: Record<string, BodyParam>
   description: string
   /** Present when this operation was extracted from a GraphQL schema. */
@@ -114,7 +109,7 @@ export interface StoredOperation {
   rawBodyContentType?: string
 }
 
-export interface StoredSpec {
+export type StoredSpec = {
   baseUrl: string
   description: string
   insecure?: boolean
@@ -127,7 +122,7 @@ export interface StoredSpec {
 }
 
 // ts-prune-ignore-next
-export interface ApiStore {
+export type ApiStore = {
   specs: Record<string, StoredSpec>
 }
 
@@ -199,7 +194,7 @@ export async function writeStore(configDir: string, store: ApiStore): Promise<vo
 
 export async function deleteSpec(configDir: string, name: string): Promise<boolean> {
   const results = await Promise.all(
-    [specFilePath(configDir, name), legacySpecFilePath(configDir, name)].map((fp) =>
+    [specFilePath(configDir, name), legacySpecFilePath(configDir, name)].map(async (fp) =>
       unlink(fp)
         .then(() => true)
         .catch((error: NodeJS.ErrnoException) => {
@@ -217,7 +212,6 @@ export async function loadSpec(source: string): Promise<OpenApiSpec> {
   let raw: string
 
   if (source.startsWith('http://') || source.startsWith('https://')) {
-    // eslint-disable-next-line n/no-unsupported-features/node-builtins
     const res = await fetch(source)
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${source}`)
     const contentType = res.headers.get('content-type') ?? ''
@@ -231,13 +225,13 @@ export async function loadSpec(source: string): Promise<OpenApiSpec> {
   }
 
   const trimmed = raw.trimStart()
-  let parsed = trimmed.startsWith('{') || trimmed.startsWith('[') ? JSON.parse(raw) : yamlLoad(raw)
+  let parsed: unknown = trimmed.startsWith('{') || trimmed.startsWith('[') ? JSON.parse(raw) : yamlLoad(raw)
 
   if (isPostmanCollection(parsed)) {
     parsed = postmanToOpenApi(parsed as PostmanCollection)
   }
 
-  const {schema} = await dereference(parsed)
+  const {schema} = dereference(parsed as OpenApiSpec)
   return (schema ?? parsed) as OpenApiSpec
 }
 
@@ -274,7 +268,7 @@ function extractBodyParams(rb: OpenApiRequestBody | undefined): Record<string, B
   const schema = rb.content?.['application/json']?.schema
   if (!schema?.properties) return bodyParams
 
-  const requiredSet = new Set(schema.required ?? [])
+  const requiredSet = new Set(schema.required)
   for (const [name, prop] of Object.entries(schema.properties)) {
     bodyParams[name] = {description: prop.description, required: requiredSet.has(name), type: inferPropertyType(prop)}
   }
@@ -315,7 +309,7 @@ export function extractOperations(spec: OpenApiSpec): StoredOperation[] {
 
   for (const [path, pathItem] of Object.entries(paths)) {
     for (const method of HTTP_METHODS) {
-      const operation = (pathItem as Record<string, OpenApiOperation>)[method]
+      const operation = pathItem[method]
       if (!operation) continue
 
       const operationId =
@@ -438,7 +432,7 @@ export function buildAuthHeaders(auth: AuthScheme): Record<string, string> {
       return {Authorization: `Bearer ${auth.token}`}
     }
 
-    default: {
+    case 'none': {
       return {}
     }
   }
@@ -455,7 +449,7 @@ export function buildAuthHeaders(auth: AuthScheme): Record<string, string> {
  * fetch below) that already hold the body as a `Buffer` — it lets callers skip
  * the extra copy that `Buffer.from(await arrayBuffer())` would otherwise make.
  */
-export interface FetchResponseLike {
+export type FetchResponseLike = {
   arrayBuffer: () => Promise<ArrayBuffer>
   buffer?: () => Promise<Buffer>
   ok: boolean
@@ -464,12 +458,10 @@ export interface FetchResponseLike {
   text: () => Promise<string>
 }
 
-export interface FetchLike {
-  (
-    url: string,
-    init?: {body?: null | string; headers?: Record<string, string>; method?: string},
-  ): Promise<FetchResponseLike>
-}
+export type FetchLike = (
+  url: string,
+  init?: {body?: null | string; headers?: Record<string, string>; method?: string},
+) => Promise<FetchResponseLike>
 
 /** Reads the full response body as a `Buffer`, avoiding a redundant copy when `buffer` is available. */
 export async function readResponseBytes(res: FetchResponseLike): Promise<Buffer> {
@@ -488,7 +480,7 @@ export async function readResponseBytes(res: FetchResponseLike): Promise<Buffer>
  * routing them through it would fail; direct is the only thing that works.
  */
 export function buildInsecureFetch(): FetchLike {
-  return (url, init = {}) =>
+  return async (url, init = {}) =>
     new Promise((resolve, reject) => {
       const u = new URL(url)
       const isHttps = u.protocol === 'https:'
@@ -514,7 +506,9 @@ export function buildInsecureFetch(): FetchLike {
         },
         (res) => {
           const chunks: Buffer[] = []
-          res.on('data', (chunk: Buffer) => chunks.push(chunk))
+          res.on('data', (chunk: Buffer) => {
+            chunks.push(chunk)
+          })
           res.on('end', () => {
             const body = Buffer.concat(chunks)
             resolve({
@@ -558,7 +552,7 @@ export function stopSpinner(msg?: string): void {
 export function buildUrl(baseUrl: string, path: string, pathParams: Record<string, string>): string {
   let resolvedPath = path
   for (const [key, value] of Object.entries(pathParams)) {
-    resolvedPath = resolvedPath.replaceAll(`{${key}}`, encodeURIComponent(value))
+    resolvedPath = resolvedPath.replaceAll(`{${key}}`, () => encodeURIComponent(value))
   }
 
   return `${baseUrl}${resolvedPath}`

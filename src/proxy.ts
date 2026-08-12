@@ -2,7 +2,7 @@ import {HttpsProxyAgent} from 'https-proxy-agent'
 import {getProxyForUrl} from 'proxy-from-env'
 
 /** Options for {@link buildProxyAgent}. */
-export interface BuildProxyAgentOptions {
+export type BuildProxyAgentOptions = {
   /**
    * Skip TLS certificate verification on the tunneled connection. Defaults to
    * `true` (verify). The insecure fetch path passes `false` for self-signed

@@ -7,12 +7,14 @@ export default class AuthUpdate extends Command {
   static args = {
     api: Args.string({description: 'API name', required: true}),
   }
+
   static description = 'Update an auth profile for an imported API'
   static examples = [
     '<%= config.bin %> api auth update petstore --type bearer --token sk-new',
     '<%= config.bin %> api auth update petstore --type apikey --api-key newkey -p prod',
     '<%= config.bin %> api auth update petstore --type bearer --token sk-... --base-url https://api.prod.example.com -p prod',
   ]
+
   static flags = {
     'api-key': Flags.string({description: 'API key value (used with --type apikey)', required: false}),
     'api-key-header': Flags.string({default: 'X-API-Key', description: 'Header name for the API key', required: false}),
@@ -49,7 +51,7 @@ export default class AuthUpdate extends Command {
 
     let existingProfiles: Record<string, AuthScheme> = {}
     try {
-      existingProfiles = (await pm.readProfiles()) as Record<string, AuthScheme>
+      existingProfiles = await pm.readProfiles()
     } catch {}
 
     if (!existingProfiles[profileName]) {

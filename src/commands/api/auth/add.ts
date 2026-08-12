@@ -7,6 +7,7 @@ export default class AuthAdd extends Command {
   static args = {
     api: Args.string({description: 'API name', required: true}),
   }
+
   static description = 'Add an auth profile for an imported API'
   static examples = [
     '<%= config.bin %> api auth add petstore --type bearer --token sk-...',
@@ -16,6 +17,7 @@ export default class AuthAdd extends Command {
     '<%= config.bin %> api auth add petstore --type bearer --token sk-... --base-url https://api.prod.example.com',
     '<%= config.bin %> api auth add petstore --type none',
   ]
+
   static flags = {
     'api-key': Flags.string({description: 'API key value (used with --type apikey)', required: false}),
     'api-key-header': Flags.string({default: 'X-API-Key', description: 'Header name for the API key', required: false}),
@@ -50,7 +52,7 @@ export default class AuthAdd extends Command {
     const pm = createApiAuthManager(this.config, args.api)
     let existingProfiles: Record<string, AuthScheme> = {}
     try {
-      existingProfiles = (await pm.readProfiles()) as Record<string, AuthScheme>
+      existingProfiles = await pm.readProfiles()
     } catch {}
 
     const profileName = flags.profile ?? 'default'

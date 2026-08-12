@@ -10,6 +10,7 @@ export default class ApiRemove extends Command {
       required: true,
     }),
   }
+
   static description = 'Remove an imported API spec'
   static examples = ['<%= config.bin %> api remove petstore']
 

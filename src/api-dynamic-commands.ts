@@ -46,6 +46,11 @@ function routeUrlParams(
     if (value === undefined) continue
 
     switch (param.in) {
+      // Cookie params are not supported by the CLI — ignore them.
+      case 'cookie': {
+        break
+      }
+
       case 'header': {
         headerParams[param.name] = value
         break
@@ -60,7 +65,6 @@ function routeUrlParams(
         queryParams[param.name] = value
         break
       }
-      // No default — cookie params are ignored
     }
   }
 
@@ -117,12 +121,7 @@ async function buildRequestBody(
  * Optional parameters become `--<name>` flags.
  * Body param names that collide with URL param names are prefixed with `body-`.
  */
-function createOperationCommand(
-  specName: string,
-  op: StoredOperation,
-  // eslint-disable-next-line n/no-unsupported-features/node-builtins
-  fetchFn: FetchLike = fetch,
-): typeof Command {
+function createOperationCommand(specName: string, op: StoredOperation, fetchFn: FetchLike = fetch): typeof Command {
   const urlParamNames = new Set(op.parameters.map((p) => p.name))
 
   // Spec-defined optional params overwrite same-named static flags below, so a
@@ -236,7 +235,7 @@ function createOperationCommand(
 
     async run(): Promise<void> {
       // We must cast because TypeScript cannot statically know the dynamic arg/flag types
-      const {args: a, flags: f} = await this.parse(DynamicOperationCommand as unknown as typeof Command)
+      const {args: a, flags: f} = await this.parse(DynamicOperationCommand)
 
       const store = await readStore(this.config.configDir)
       const spec = store.specs[capturedSpecName]
@@ -256,18 +255,14 @@ function createOperationCommand(
       }
 
       // ── Route URL params ────────────────────────────────────────────────────
-      const {headerParams, pathParams, queryParams} = routeUrlParams(
-        capturedOp.parameters,
-        a as Record<string, string>,
-        f as Record<string, string | undefined>,
-      )
+      const {headerParams, pathParams, queryParams} = routeUrlParams(capturedOp.parameters, a, f)
 
       // ── Build body ──────────────────────────────────────────────────────────
       const {inferredContentType, requestBody} = await buildRequestBody(
         capturedOp,
         {argNames: capturedBodyParamArgNames, flagNames: capturedBodyParamFlagNames},
-        a as Record<string, string>,
-        f as Record<string, string | undefined>,
+        a,
+        f,
       )
 
       // ── Parse extra headers ─────────────────────────────────────────────────
@@ -282,7 +277,7 @@ function createOperationCommand(
       // ── Build headers ───────────────────────────────────────────────────────
       // extraHeaders (from --header) take priority — they can override the inferred Content-Type.
       const headers: Record<string, string> = {
-        ...(auth ? buildAuthHeaders(auth) : {}),
+        ...(auth && buildAuthHeaders(auth)),
         ...headerParams,
       }
       if (inferredContentType && !extraHeaders['Content-Type']) {
@@ -293,7 +288,7 @@ function createOperationCommand(
 
       // ── Execute ─────────────────────────────────────────────────────────────
       const method = capturedOp.method.toUpperCase()
-      this.log(`${method} ${url.toString()}`)
+      this.log(`${method} ${url.href}`)
 
       // A spinner (on stderr, so piped stdout stays clean) reassures the user
       // while the request is in flight — downloads to a file can be large
@@ -301,8 +296,8 @@ function createOperationCommand(
       const outputPath = capturedOutputFlagShadowed ? undefined : (f.output as string | undefined)
       startSpinner(outputPath ? `Downloading to ${outputPath}` : `${method} request`)
 
-      const fetchFn = spec.insecure ? buildInsecureFetch() : this._fetch
-      const res = await fetchFn(url.toString(), {
+      const innerFetch = spec.insecure ? buildInsecureFetch() : this._fetch
+      const res = await innerFetch(url.href, {
         body: requestBody,
         headers,
         method,
@@ -346,7 +341,7 @@ function createOperationCommand(
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
-interface LoadableCommand {
+type LoadableCommand = {
   aliases: string[]
   args: Record<string, unknown>
   description?: string
@@ -359,7 +354,7 @@ interface LoadableCommand {
   strict: boolean
 }
 
-interface InternalConfig {
+type InternalConfig = {
   _commands: Map<string, LoadableCommand>
   _topics: Map<string, {description?: string; hidden: boolean; name: string}>
 }
@@ -391,9 +386,9 @@ export async function registerApiCommands(config: Config): Promise<void> {
 
       internal._commands.set(commandId, {
         aliases: [],
-        args: CmdClass.args as Record<string, unknown>,
+        args: CmdClass.args,
         description: op.description || `${op.method.toUpperCase()} ${op.path}`,
-        flags: CmdClass.flags as Record<string, unknown>,
+        flags: CmdClass.flags,
         hidden: false,
         id: commandId,
         async load() {

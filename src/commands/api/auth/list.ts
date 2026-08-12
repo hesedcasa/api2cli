@@ -29,7 +29,7 @@ function formatAuth(auth: AuthScheme): string {
       return `  type  : bearer\n  token : ${redact(auth.token)}`
     }
 
-    default: {
+    case 'none': {
       return '  type: none'
     }
   }
@@ -39,6 +39,7 @@ export default class AuthList extends Command {
   static args = {
     api: Args.string({description: 'API name', required: true}),
   }
+
   static description = 'List auth profiles for an imported API'
   static examples = ['<%= config.bin %> api auth list petstore']
   static flags = {}
@@ -69,7 +70,7 @@ export default class AuthList extends Command {
     const defaultProfile = await pm.getDefaultProfile().catch(() => 'default')
 
     this.log(`Auth profiles for "${args.api}":`)
-    for (const [name, auth] of Object.entries(profiles) as [string, AuthScheme][]) {
+    for (const [name, auth] of Object.entries(profiles)) {
       const marker = name === defaultProfile ? ' (default)' : ''
       this.log(`\n${name}${marker}:`)
       this.log(formatAuth(auth))
