@@ -1,0 +1,70 @@
+name: Run end-to-end tests
+
+permissions: read-all
+
+# Nightly and on demand only. These tests run against the same live Linear
+# workspace and Vercel/Context7 accounts on every invocation, so running them
+# per pull request would let concurrent runs collide on fixtures, and fork PRs
+# cannot read the secrets they need.
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: api2cli-e2e
+  cancel-in-progress: false
+
+jobs:
+  run-e2e-tests:
+    name: End-to-end tests against Linear, Vercel and Context7
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        # Pinned to the commit the v5 tag points at, so a repointed tag cannot
+        # substitute code ahead of the secret-bearing steps below.
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 2
+          # Nothing here pushes, and the default would leave GITHUB_TOKEN in
+          # the workspace git config for every later step to reuse.
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          cache: npm
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The steps below are what `npm run test:e2e` does locally, split out so
+      # the sweep still runs when a test fails.
+      - name: Build the CLI
+        run: npm run build
+
+      # The API keys are scoped to the two steps that actually talk to the
+      # live APIs, so nothing before them — actions, `npm ci` lifecycle
+      # scripts, the build — ever has them in its environment.
+      - name: Run end-to-end tests
+        run: npm run e2e:mocha
+        env:
+          CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          VERCEL_API_KEY: ${{ secrets.VERCEL_API_KEY }}
+          E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+
+      # `always()`, so a killed mocha run (the job timeout above skips its
+      # `after` hooks) still gets its fixtures reclaimed. E2E_RUN_ID is what
+      # makes that possible: it pins this run's title prefix so the sweep can
+      # delete this run's fixtures, not just the ones older than an hour.
+      - name: Sweep leftover fixtures
+        if: always()
+        run: npm run e2e:sweep
+        env:
+          CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          VERCEL_API_KEY: ${{ secrets.VERCEL_API_KEY }}
+          E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}

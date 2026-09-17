@@ -14,8 +14,19 @@ import {readStore} from '../../api-store.js'
  *
  * By the time this `command_not_found` hook runs, the `init` hook has already
  * registered the dynamic commands, so we can recover here: split the
- * mis-joined id back into the real `spec:operationId` command plus the args
- * that got wrongly absorbed, and retry.
+ * mis-joined id back into the real `spec:operationId` command plus the
+ * arguments that got wrongly absorbed, and retry.
+ *
+ * The split needs one care: the join collapsed both argument boundaries and
+ * any colon *inside* an argument into the same character — a JSON payload's
+ * `"key":` sequences are indistinguishable from the separators between two
+ * arguments. What breaks the tie is the operation itself, which knows how many
+ * positional arguments it takes: the first N-1 colon-split pieces are the
+ * first N-1 positionals (URL/query parameters — colon-free in practice), and
+ * every remaining piece is rejoined with ':' into the LAST positional, which
+ * is where JSON payloads live (`{"title":"x"}` arrives as several fragments
+ * and leaves as one argument). `opts.argv` (the tokens oclif kept after the
+ * absorbed id — trailing flags, usually) is appended unchanged.
  *
  * When the id can't be recovered this way, the hook must fail without
  * winning the race against other, still-pending `command_not_found` hooks —
@@ -38,10 +49,23 @@ import {readStore} from '../../api-store.js'
 const hook: Hook<'command_not_found'> = async function (opts) {
   const parts = opts.id.split(':')
   if (parts.length > 2) {
-    const [specName, operationId, ...swallowedArgs] = parts
+    const [specName, operationId] = parts
     const store = await readStore(opts.config.configDir).catch(() => null)
     const op = store?.specs[specName]?.operations.find((o) => o.operationId === operationId)
     if (op) {
+      // Mirrors the positional args the dynamic command class declares:
+      // required URL/query/header parameters first, then required body params.
+      const positionalCount =
+        op.parameters.filter((p) => p.required).length + Object.values(op.bodyParams).filter((p) => p.required).length
+      const raw = parts.slice(2)
+      // More fragments than positionals means colons inside the last
+      // argument: hand the first N-1 fragments to the first N-1 positionals
+      // and rejoin the rest. With N=1 this is the whole tail as one argument.
+      const swallowedArgs =
+        raw.length <= positionalCount
+          ? raw
+          : [...raw.slice(0, positionalCount - 1), raw.slice(positionalCount - 1).join(':')]
+
       return opts.config.runCommand(`${specName}:${operationId}`, [...swallowedArgs, ...(opts.argv ?? [])])
     }
   }

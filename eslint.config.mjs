@@ -17,8 +17,13 @@ const config = [
   // mocks don't need full type information and shouldn't fail type-aware rules
   // such as no-unsafe-* / no-base-to-string. tsconfig.json excludes ./test, so
   // those rules have no project to resolve against anyway.
+  //
+  // scripts/ gets the same treatment: it holds standalone maintenance scripts
+  // (e.g. the stale-fixture sweep) that run via ts-node and aren't part of the
+  // src/ build project, so there is no tsconfig for the type-aware project
+  // service to resolve them against.
   {
-    files: ['test/**/*.ts'],
+    files: ['test/**/*.ts', 'scripts/**/*.ts'],
     ...tseslint.configs.disableTypeChecked,
   },
   // typescript-eslint is a transitive dependency (via eslint-config-oclif), so
@@ -87,6 +92,31 @@ const config = [
       'unicorn/prefer-https': 'off',
       'unicorn/prefer-math-constants': 'off',
       'unicorn/prefer-string-repeat': 'off',
+    },
+  },
+  {
+    // The e2e suite runs every hook as async/await, so it never passes a done
+    // callback — but the rule misreads the TS `this: Mocha.Context` parameter
+    // annotation as one, flagging every `before(async function (this) ...)`.
+    files: ['test/e2e/**/*.ts'],
+    rules: {
+      'mocha/handle-done-callback': 'off',
+      // Sequential awaits against live APIs are the point of an e2e suite:
+      // each step asserts on the previous one, and parallel runs would race
+      // the fixtures.
+      'no-await-in-loop': 'off',
+    },
+  },
+  {
+    // test/e2e/helpers.ts is a shared module, not a test suite: it exports the
+    // runner utilities every e2e file imports, and registers one root-level
+    // `after` that removes the shared config dir when the process exits.
+    files: ['test/e2e/helpers.ts'],
+    rules: {
+      'func-names': 'off',
+      'mocha/no-exports': 'off',
+      'mocha/no-top-level-hooks': 'off',
+      'unicorn/no-top-level-side-effects': 'off',
     },
   },
   prettier,
