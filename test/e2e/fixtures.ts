@@ -230,14 +230,27 @@ export async function cleanupRun(): Promise<void> {
  */
 export async function sweepStale(): Promise<number> {
   const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-  const ids = await linearGql<IssuePage>(
-    `query ($filter: IssueFilter) { issues(filter: $filter, first: 100) { nodes { id } pageInfo { endCursor hasNextPage } } }`,
-    {filter: {createdAt: {lte: cutoff}, title: {startsWith: SHARED_PREFIX}}},
-  ).then(({body}) => {
+  const ids: string[] = []
+  let after: string | undefined
+
+  // Every page, for the same reason as findIssuesByTitle: stopping at the
+  // first 100 would delete one page of stale fixtures and report success,
+  // leaving the rest for a sweep that keeps "passing" without reaching them.
+  do {
+    const {body} = await linearGql<IssuePage>(
+      `query ($filter: IssueFilter, $after: String) { issues(filter: $filter, after: $after, first: 100) { nodes { id } pageInfo { endCursor hasNextPage } } }`,
+      {after, filter: {createdAt: {lte: cutoff}, title: {startsWith: SHARED_PREFIX}}},
+    )
+
     const messages = gqlErrorMessages(body)
-    if (messages.length > 0) throw new Error(`sweepStale failed: ${messages.join('; ')}`)
-    return (body.data?.issues?.nodes ?? []).map((node) => node.id)
-  })
+    if (messages.length > 0) {
+      throw new Error(`sweepStale failed: ${messages.join('; ')}`)
+    }
+
+    const page = body.data?.issues
+    ids.push(...(page?.nodes ?? []).map((node) => node.id))
+    after = page?.pageInfo.hasNextPage ? (page.pageInfo.endCursor ?? undefined) : undefined
+  } while (after)
 
   await deleteAll(ids)
   return ids.length

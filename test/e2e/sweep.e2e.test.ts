@@ -50,6 +50,10 @@ const ACCEPTED_MUTATIONS = new Set<string>([
   // authId. No credential exists for it, so the challenge can never verify and
   // no account state changes. Observed live: {options:{challenge,…}, success:true}.
   'passkeyLoginStart',
+  // Second delete-by-junk-id no-op, same class as favoriteDelete: view
+  // preferences are addressed by id, nothing exists at the probe id, and
+  // Linear reports success regardless. Observed live:
+  // {"data":{"viewPreferencesDelete":{"success":true}}}.
   'viewPreferencesDelete',
 ])
 
