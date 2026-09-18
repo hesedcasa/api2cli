@@ -2,7 +2,7 @@
 
 ## End-to-end tests
 
-`test/e2e/**` runs the built `bin/run.js` as a real subprocess against three live APIs — Linear (GraphQL), Vercel and Context7 (OpenAPI). `npm run test:e2e` then reruns the same suite through the latest sdkck host CLI with the current build packed and installed as its `@hesed/api2cli` plugin — the host switch (`E2E_HOST_CLI=sdkck` + `E2E_SDKCK_HOME`, set by `scripts/e2e.sh` and the CI workflow) lives in `test/e2e/helpers.ts`; the plugin must be installed before any `sdkck api` call, or sdkck auto-installs the published release, and the tarball must be a `file:` URL (bare paths read as GitHub `org/repo`). It is excluded from `npm test` and needs credentials exported first, because nothing in this repo loads `.env`:
+`test/e2e/**` runs the built `bin/run.js` as a real subprocess against three live APIs — Linear (GraphQL), Vercel and Context7 (OpenAPI). `npm run test:e2e` then reruns the same suite through the pinned sdkck host CLI with the current build packed and installed as its `@hesed/api2cli` plugin — the host switch (`E2E_HOST_CLI=sdkck` + `E2E_SDKCK_HOME`, set by `scripts/e2e.sh` and the CI workflow) lives in `test/e2e/helpers.ts`; the plugin must be installed before any `sdkck api` call, or sdkck auto-installs the published release, and the tarball must be a `file:` URL (bare paths read as GitHub `org/repo`); sdkck itself is pinned to an exact release with a verified sha512 because the host runs the plugin in-process with the live credentials in its environment (version and hash live in both `scripts/e2e.sh` and the CI workflow — bump deliberately). It is excluded from `npm test` and needs credentials exported first, because nothing in this repo loads `.env`:
 
 ```bash
 set -a; . ./.env; set +a

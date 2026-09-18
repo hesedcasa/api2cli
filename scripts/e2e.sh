@@ -99,17 +99,42 @@ run_mocha
 
 # Second leg: the same suite through the sdkck host CLI, with this build
 # installed as its @hesed/api2cli plugin.
-echo "==> Downloading the latest sdkck"
-# --no-save resolves "latest" from the registry on every run without touching
-# package.json; the binary comes from node_modules/.bin.
-npm install --silent --no-save sdkck
-export PATH="$PWD/node_modules/.bin:$PATH"
 
 # A throwaway sdkck home keeps the plugin install, its config and its caches
 # out of the developer's real sdkck setup; the test side finds it via
-# E2E_SDKCK_HOME.
+# E2E_SDKCK_HOME. The pinned tarball below is downloaded into it, so the EXIT
+# trap cleans that up too.
 SDKCK_HOME="$(mktemp -d)"
 export E2E_SDKCK_HOME="$SDKCK_HOME"
+
+echo "==> Downloading the pinned sdkck"
+# The host CLI runs the plugin in-process with the live API credentials in its
+# environment, so it must not be fetched from the mutable `latest` tag: pin an
+# exact release and verify its sha512 before installing. Bump deliberately,
+# updating SDKCK_SHA512 with it (`npm view sdkck@<version> dist.integrity`),
+# and keep the two values in sync with .github/workflows/run-e2e-tests.yml.
+SDKCK_VERSION=0.36.3
+SDKCK_SHA512='sha512-D8r1lr46mR9itcT6614ejwLhQ+vlaI2d9jLkrDya9OD80ZumhXdGZJggnHr4U0yDmfwmRgshA8A2dPBEKmXtig=='
+SDKCK_TGZ="$SDKCK_HOME/sdkck-$SDKCK_VERSION.tgz"
+curl -fsSL -o "$SDKCK_TGZ" "https://registry.npmjs.org/sdkck/-/sdkck-$SDKCK_VERSION.tgz"
+# npm reports integrity as `sha512-<base64>`; verify with node rather than
+# shasum so macOS (dev) and ubuntu (CI) behave identically.
+node -e '
+const {createHash} = require("node:crypto")
+const {readFileSync} = require("node:fs")
+const want = String(process.argv[2]).replace(/^sha512-/, "")
+const actual = createHash("sha512").update(readFileSync(process.argv[1])).digest("base64")
+if (actual !== want) {
+  console.error("sha512 mismatch for " + process.argv[1] + ": got " + actual + ", want " + want)
+  process.exit(1)
+}
+' "$SDKCK_TGZ" "$SDKCK_SHA512"
+
+# --no-save never touches package.json; installing from the verified local
+# tarball keeps the mutable registry state out of the loop, and the binary
+# comes from node_modules/.bin.
+npm install --silent --no-save "$SDKCK_TGZ"
+export PATH="$PWD/node_modules/.bin:$PATH"
 
 echo "==> Packing the current build and installing it as an sdkck plugin"
 # npm pack runs `prepack`, regenerating oclif.manifest.json and the README —
