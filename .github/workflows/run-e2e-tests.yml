@@ -19,7 +19,9 @@ jobs:
   run-e2e-tests:
     name: End-to-end tests against Linear, Vercel and Context7
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Two legs (standalone CLI, then the same suite via sdkck) at up to 2
+    # minutes per test.
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         # Pinned to the commit the v5 tag points at, so a repointed tag cannot
@@ -55,6 +57,62 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           VERCEL_API_KEY: ${{ secrets.VERCEL_API_KEY }}
           E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+
+      # Second leg: the same suite through the pinned sdkck host CLI with this
+      # build packed and installed as its @hesed/api2cli plugin — covering the
+      # `prepack` artifacts (oclif.manifest.json, README) and plugin dispatch
+      # under a host. The plugin is installed before any `sdkck api` call so
+      # sdkck's first-use auto-installer cannot fetch the published release
+      # over this build. The throwaway sdkck home (mktemp -d) keeps the
+      # install, config and caches out of the runner's real sdkck setup; the
+      # test side finds it via E2E_SDKCK_HOME.
+      - name: Install the pinned sdkck and the packed plugin
+        run: |
+          home="$(mktemp -d)"
+          echo "E2E_SDKCK_HOME=$home" >> "$GITHUB_ENV"
+          # The host CLI runs the plugin in-process with the live API
+          # credentials in its environment, so it must not be fetched from the
+          # mutable `latest` tag: pin an exact release and verify its sha512
+          # before installing. Bump deliberately, updating the hash with it
+          # (`npm view sdkck@<version> dist.integrity`), and keep the two
+          # values in sync with scripts/e2e.sh.
+          version=0.36.3
+          sha512='sha512-D8r1lr46mR9itcT6614ejwLhQ+vlaI2d9jLkrDya9OD80ZumhXdGZJggnHr4U0yDmfwmRgshA8A2dPBEKmXtig=='
+          tgz="$home/sdkck-$version.tgz"
+          curl -fsSL -o "$tgz" "https://registry.npmjs.org/sdkck/-/sdkck-$version.tgz"
+          # npm reports integrity as `sha512-<base64>`; verify with node
+          # rather than sha512sum for identical behaviour everywhere.
+          node -e '
+          const {createHash} = require("node:crypto")
+          const {readFileSync} = require("node:fs")
+          const want = String(process.argv[2]).replace(/^sha512-/, "")
+          const actual = createHash("sha512").update(readFileSync(process.argv[1])).digest("base64")
+          if (actual !== want) {
+            console.error("sha512 mismatch for " + process.argv[1] + ": got " + actual + ", want " + want)
+            process.exit(1)
+          }
+          ' "$tgz" "$sha512"
+          # --no-save never touches package.json; installing from the verified
+          # local tarball keeps the mutable registry state out of the loop.
+          npm install --no-save "$tgz"
+          # A `file:` URL is required: sdkck resolves any bare path containing
+          # a slash as a GitHub org/repo. Packing into the throwaway home
+          # keeps the tarball out of the workspace.
+          plugin="$(npm pack --pack-destination "$home" | tail -n 1)"
+          SDKCK_CACHE_DIR="$home/cache" \
+          SDKCK_CONFIG_DIR="$home/config" \
+          SDKCK_DATA_DIR="$home/data" \
+            ./node_modules/.bin/sdkck plugins install "file:$home/$plugin"
+
+      - name: Run end-to-end tests via sdkck
+        run: npm run e2e:mocha
+        env:
+          CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          VERCEL_API_KEY: ${{ secrets.VERCEL_API_KEY }}
+          E2E_HOST_CLI: sdkck
+          E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          E2E_SDKCK_HOME: ${{ env.E2E_SDKCK_HOME }}
 
       # `always()`, so a killed mocha run (the job timeout above skips its
       # `after` hooks) still gets its fixtures reclaimed. E2E_RUN_ID is what

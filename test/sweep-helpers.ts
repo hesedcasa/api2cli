@@ -146,10 +146,7 @@ function parseWarnedStatus(stderr: string): number | undefined {
   let at = stderr.indexOf('HTTP ')
   while (at !== -1) {
     const digits = stderr.slice(at + 5, at + 8)
-    if (
-      digits.length === 3 &&
-      [...digits].every((c) => c >= '0' && c <= '9')
-    ) {
+    if (digits.length === 3 && [...digits].every((c) => c >= '0' && c <= '9')) {
       return Number(digits)
     }
 
@@ -203,9 +200,7 @@ export function judgeProbe(plan: ProbePlan, execution: ProbeExecution): ProbeVer
       const payload = envelope.data?.[envelopeKey]
       if (payload !== undefined && payload !== null) {
         const wasRejected =
-          typeof payload === 'object' &&
-          'success' in payload &&
-          (payload as {success?: unknown}).success === false
+          typeof payload === 'object' && 'success' in payload && (payload as {success?: unknown}).success === false
         if (!wasRejected) {
           return {
             ok: false,
@@ -219,7 +214,11 @@ export function judgeProbe(plan: ProbePlan, execution: ProbeExecution): ProbeVer
     }
 
     if (status < 300) {
-      return {ok: false, status, violation: `mutating endpoint returned 2xx — allowlist or exclude "${plan.operationId}"`}
+      return {
+        ok: false,
+        status,
+        violation: `mutating endpoint returned 2xx — allowlist or exclude "${plan.operationId}"`,
+      }
     }
 
     return {ok: true, status}
@@ -243,7 +242,11 @@ export function shouldRetry(execution: ProbeExecution): boolean {
  * preserving no ordering guarantees. Worker errors propagate after the in-flight
  * batch settles.
  */
-export async function runPool<T>(items: readonly T[], limit: number, worker: (item: T) => Promise<void>): Promise<void> {
+export async function runPool<T>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
   let next = 0
   const runners = Array.from({length: Math.min(limit, items.length)}, async () => {
     while (next < items.length) {

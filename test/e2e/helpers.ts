@@ -69,18 +69,60 @@ export type CliResult = {
 }
 
 /**
- * Runs the built CLI (`bin/run.js`) as a real subprocess against an isolated
- * config dir. Non-zero exits are returned rather than thrown so tests can
- * assert on failure paths.
+ * Builds the subprocess invocation for the configured host CLI.
+ *
+ * By default the built standalone CLI (`bin/run.js`) runs with `API_CONFIG_DIR`
+ * (oclif scopes that env var by bin name). When `E2E_HOST_CLI=sdkck`, the same
+ * arguments go to the `sdkck` binary instead — the argv is host-agnostic
+ * because every command already carries the `api` topic prefix — and oclif's
+ * bin-scoped `SDKCK_*` dirs are redirected: config to the same throwaway
+ * config dir the standalone leg uses, data/cache into the throwaway sdkck home
+ * (`E2E_SDKCK_HOME`) that the scripts installed the plugin into.
  *
  * @param args Command line arguments, e.g. ['api', 'call', 'linear', 'viewer'].
  * @param configDir Value for API_CONFIG_DIR, from createConfigDir() or the shared dir.
+ * @returns The executable, its argv, and env overrides to layer over process.env.
+ */
+function hostInvocation(
+  args: string[],
+  configDir: string,
+): {argv: string[]; command: string; env: Record<string, string>} {
+  if (process.env.E2E_HOST_CLI === 'sdkck') {
+    const home = process.env.E2E_SDKCK_HOME
+    if (!home) {
+      throw new Error('E2E_HOST_CLI=sdkck requires E2E_SDKCK_HOME — set by scripts/e2e.sh or the CI workflow')
+    }
+
+    return {
+      argv: args,
+      command: 'sdkck',
+      env: {
+        SDKCK_CACHE_DIR: path.join(home, 'cache'),
+        SDKCK_CONFIG_DIR: configDir,
+        SDKCK_DATA_DIR: path.join(home, 'data'),
+      },
+    }
+  }
+
+  return {argv: [CLI, ...args], command: process.execPath, env: {API_CONFIG_DIR: configDir}}
+}
+
+/**
+ * Runs the host CLI as a real subprocess against an isolated config dir. The
+ * host is the built standalone CLI unless `E2E_HOST_CLI=sdkck` (see
+ * hostInvocation()). Non-zero exits are returned rather than thrown so tests
+ * can assert on failure paths.
+ *
+ * @param args Command line arguments, e.g. ['api', 'call', 'linear', 'viewer'].
+ * @param configDir Value for API_CONFIG_DIR / SDKCK_CONFIG_DIR, from
+ *   createConfigDir() or the shared dir.
  * @returns The exit code and captured stdout/stderr.
  */
 export async function runCli(args: string[], configDir: string): Promise<CliResult> {
+  const {argv, command, env} = hostInvocation(args, configDir)
   try {
-    const {stderr, stdout} = await execFileAsync(process.execPath, [CLI, ...args], {
-      env: {...process.env, API_CONFIG_DIR: configDir, FORCE_COLOR: '0', NO_COLOR: '1'},
+    const {stderr, stdout} = await execFileAsync(command, argv, {
+      env: {...process.env, FORCE_COLOR: '0', NO_COLOR: '1', ...env},
       maxBuffer: 64 * 1024 * 1024,
     })
     return {code: 0, stderr, stdout}
