@@ -2,13 +2,11 @@ name: Run end-to-end tests
 
 permissions: read-all
 
-# Nightly and on demand only. These tests run against the same live Linear
-# workspace and Vercel/Context7 accounts on every invocation, so running them
-# per pull request would let concurrent runs collide on fixtures, and fork PRs
-# cannot read the secrets they need.
+# On demand only. These tests run against the same live Linear workspace and
+# Vercel/Context7 accounts on every invocation, so running them per pull
+# request would let concurrent runs collide on fixtures, and fork PRs cannot
+# read the secrets they need.
 on:
-  schedule:
-    - cron: '23 3 * * *'
   workflow_dispatch:
 
 concurrency:
