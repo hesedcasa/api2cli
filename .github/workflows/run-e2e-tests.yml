@@ -5,7 +5,7 @@ permissions: read-all
 # On demand only. These tests run against the same live Linear workspace and
 # Vercel/Context7 accounts on every invocation, so running them per pull
 # request would let concurrent runs collide on fixtures, and fork PRs cannot
-# read the secrets they need.
+# get the OIDC token they need for the account credentials.
 on:
   workflow_dispatch:
 
@@ -14,16 +14,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  run-e2e-tests:
-    name: End-to-end tests against Linear, Vercel and Context7
+  # Everything that installs or builds runs here, with no OIDC permission: a
+  # compromised `npm ci` lifecycle script can neither read the account
+  # credentials nor request a token to fetch them itself.
+  build:
+    name: Build the CLI and install the sdkck host
     runs-on: ubuntu-latest
-    # Two legs (standalone CLI, then the same suite via sdkck) at up to 2
-    # minutes per test.
-    timeout-minutes: 45
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Check out repository
         # Pinned to the commit the v5 tag points at, so a repointed tag cannot
-        # substitute code ahead of the secret-bearing steps below.
+        # substitute code ahead of the steps below.
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 2
@@ -40,34 +43,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The steps below are what `npm run test:e2e` does locally, split out so
-      # the sweep still runs when a test fails.
       - name: Build the CLI
         run: npm run build
 
-      # The API keys are scoped to the two steps that actually talk to the
-      # live APIs, so nothing before them — actions, `npm ci` lifecycle
-      # scripts, the build — ever has them in its environment.
-      - name: Run end-to-end tests
-        run: npm run e2e:mocha
-        env:
-          CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          VERCEL_API_KEY: ${{ secrets.VERCEL_API_KEY }}
-          E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-
-      # Second leg: the same suite through the pinned sdkck host CLI with this
-      # build packed and installed as its @hesed/api2cli plugin — covering the
-      # `prepack` artifacts (oclif.manifest.json, README) and plugin dispatch
-      # under a host. The plugin is installed before any `sdkck api` call so
-      # sdkck's first-use auto-installer cannot fetch the published release
-      # over this build. The throwaway sdkck home (mktemp -d) keeps the
+      # For the second leg: the same suite through the pinned sdkck host CLI
+      # with this build packed and installed as its @hesed/api2cli plugin —
+      # covering the `prepack` artifacts (oclif.manifest.json, README) and
+      # plugin dispatch under a host. The plugin is installed before any
+      # `sdkck api` call so sdkck's first-use auto-installer cannot fetch the
+      # published release over this build. The throwaway sdkck home keeps the
       # install, config and caches out of the runner's real sdkck setup; the
       # test side finds it via E2E_SDKCK_HOME.
       - name: Install the pinned sdkck and the packed plugin
         run: |
-          home="$(mktemp -d)"
-          echo "E2E_SDKCK_HOME=$home" >> "$GITHUB_ENV"
+          home="$RUNNER_TEMP/sdkck-home"
+          mkdir -p "$home"
           # The host CLI runs the plugin in-process with the live API
           # credentials in its environment, so it must not be fetched from the
           # mutable `latest` tag: pin an exact release and verify its sha512
@@ -102,25 +92,142 @@ jobs:
           SDKCK_DATA_DIR="$home/data" \
             ./node_modules/.bin/sdkck plugins install "file:$home/$plugin"
 
-      - name: Run end-to-end tests via sdkck
+      # Only the build outputs travel: the jobs that hold the credentials check
+      # out the repository themselves, so a lifecycle script that edits or
+      # adds a source, test or script file here cannot get it run there.
+      # node_modules and the sdkck plugin are still installed code — the tests
+      # cannot run without them — so this narrows, not removes, that trust.
+      # A tarball rather than the artifact's own zip, which drops executable
+      # bits and node_modules/.bin symlinks. Absolute paths are kept because
+      # the sdkck install records them, and hosted runners share one layout.
+      - name: Pack the build outputs and sdkck home
+        run: |
+          tar -czf "$RUNNER_TEMP/e2e-workspace.tgz" -C / \
+            "${GITHUB_WORKSPACE#/}/node_modules" "${GITHUB_WORKSPACE#/}/dist" \
+            "${RUNNER_TEMP#/}/sdkck-home"
+
+      - name: Upload the workspace
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-workspace
+          path: ${{ runner.temp }}/e2e-workspace.tgz
+          retention-days: 1
+
+  run-e2e-tests:
+    name: End-to-end tests against Linear, Vercel and Context7
+    needs: build
+    runs-on: ubuntu-latest
+    # Two legs (standalone CLI, then the same suite via sdkck) at up to 2
+    # minutes per test.
+    timeout-minutes: 45
+    # id-token lets the Infisical action exchange GitHub's OIDC token for the
+    # account credentials, so no Infisical secret is stored in the repo. Only
+    # this job and the sweep have it, and nothing in either installs packages.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # A fresh checkout of the dispatched commit, not the build job's copy:
+      # see "Pack the build outputs and sdkck home".
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Download the build outputs
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e2e-workspace
+          path: ${{ runner.temp }}
+
+      # Extracts only the named members, so nothing else in the archive can
+      # land over the checkout.
+      - name: Unpack the build outputs and sdkck home
+        run: |
+          tar -xzf "$RUNNER_TEMP/e2e-workspace.tgz" -C / \
+            "${GITHUB_WORKSPACE#/}/node_modules" "${GITHUB_WORKSPACE#/}/dist" \
+            "${RUNNER_TEMP#/}/sdkck-home"
+          echo "E2E_SDKCK_HOME=$RUNNER_TEMP/sdkck-home" >> "$GITHUB_ENV"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: '.nvmrc'
+
+      # The Infisical action exports the account credentials to $GITHUB_ENV,
+      # so every later step sees them; the steps before it never do.
+      - name: Fetch account credentials from Infisical
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
+          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
+          env-slug: dev
+
+      - name: Run end-to-end tests
         run: npm run e2e:mocha
         env:
-          CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          VERCEL_API_KEY: ${{ secrets.VERCEL_API_KEY }}
+          E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+
+      # `!cancelled()`, so a failing standalone leg still runs the sdkck leg.
+      - name: Run end-to-end tests via sdkck
+        if: ${{ !cancelled() }}
+        run: npm run e2e:mocha
+        env:
           E2E_HOST_CLI: sdkck
           E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-          E2E_SDKCK_HOME: ${{ env.E2E_SDKCK_HOME }}
 
-      # `always()`, so a killed mocha run (the job timeout above skips its
-      # `after` hooks) still gets its fixtures reclaimed. E2E_RUN_ID is what
-      # makes that possible: it pins this run's title prefix so the sweep can
-      # delete this run's fixtures, not just the ones older than an hour.
+  # A separate job, not a step with `if: always()`: a job cancelled by its
+  # timeout-minutes never starts its remaining steps, so an in-job fallback
+  # sweep would be skipped in exactly the scenario it exists for. A dependent
+  # job with `if: always()` still runs when the test job fails, times out, or
+  # is cancelled — only a failed build has nothing to reclaim, since no test
+  # ran. E2E_RUN_ID is derivable in any job of the same workflow run, which is
+  # what lets this sweep delete the test job's fixtures, not just the ones
+  # older than an hour. It reuses the build job's node_modules, so it installs
+  # nothing while holding id-token.
+  sweep-fixtures:
+    name: Sweep leftover fixtures
+    runs-on: ubuntu-latest
+    needs: [build, run-e2e-tests]
+    if: always() && needs.build.result == 'success'
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # A fresh checkout of the dispatched commit, not the build job's copy:
+      # see "Pack the build outputs and sdkck home".
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Download the build outputs
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e2e-workspace
+          path: ${{ runner.temp }}
+
+      # The sweep runs from source via ts-node, so it needs node_modules only.
+      - name: Unpack node_modules
+        run: tar -xzf "$RUNNER_TEMP/e2e-workspace.tgz" -C / "${GITHUB_WORKSPACE#/}/node_modules"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Fetch account credentials from Infisical
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
+          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
+          env-slug: dev
+
+      # Deletes this run's fixtures (E2E_RUN_ID) and any older than an hour.
       - name: Sweep leftover fixtures
-        if: always()
         run: npm run e2e:sweep
         env:
-          CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          VERCEL_API_KEY: ${{ secrets.VERCEL_API_KEY }}
           E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
