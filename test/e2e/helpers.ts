@@ -23,8 +23,7 @@ export const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql'
 export const LINEAR_SCHEMA_URL =
   'https://raw.githubusercontent.com/linear/linear/refs/heads/master/packages/sdk/src/schema.graphql'
 export const VERCEL_SPEC_URL = 'https://openapi.vercel.sh/'
-export const CONTEXT7_SPEC_URL =
-  'https://raw.githubusercontent.com/upstash/context7/refs/heads/master/docs/openapi.json'
+export const CONTEXT7_SPEC_URL = 'https://context7.com/openapi.json'
 
 export type Secrets = {
   context7: string
@@ -35,7 +34,7 @@ export type Secrets = {
 /**
  * Reads the three live-API credentials from the environment.
  *
- * Nothing in this repo loads .env, so these must already be exported.
+ * They come from Infisical, so run under `infisical run --`.
  */
 export function requireEnv(): Secrets {
   const linear = process.env.LINEAR_API_KEY
@@ -45,7 +44,7 @@ export function requireEnv(): Secrets {
   if (!linear || !vercel || !context7) {
     throw new Error(
       'Missing LINEAR_API_KEY, VERCEL_API_KEY or CONTEXT7_API_KEY. ' +
-        'Nothing in this repo loads .env — run: set -a; . ./.env; set +a',
+        'Run under Infisical: infisical run -- npm run e2e:mocha',
     )
   }
 
@@ -157,8 +156,9 @@ export function redactSecret(text: string, needles: string[]): string {
 /**
  * Runs the CLI and fails the test if it exited non-zero.
  *
- * The failure message redacts the three API keys from stdout/stderr before
- * they are interpolated, so a failing call never prints a live credential
+ * The failure message redacts the three API keys from the command line and
+ * stdout/stderr before they are interpolated — `auth add --api-key` carries a
+ * live key in its args — so a failing call never prints a live credential
  * into mocha's failure output or CI logs. The returned `CliResult` itself is
  * left unredacted — tests need the real values to assert on.
  *
@@ -171,7 +171,8 @@ export async function runCliOk(args: string[], configDir: string): Promise<CliRe
   const needles = secrets()
   const stdout = redactSecret(result.stdout, needles)
   const stderr = redactSecret(result.stderr, needles)
-  expect(result.code, `\`api ${args.join(' ')}\` failed:\n${stdout}\n${stderr}`).to.equal(0)
+  const command = redactSecret(args.join(' '), needles)
+  expect(result.code, `\`api ${command}\` failed:\n${stdout}\n${stderr}`).to.equal(0)
   return result
 }
 

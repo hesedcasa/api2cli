@@ -4,9 +4,11 @@
 # the latest sdkck host CLI with this build packed and installed as its
 # @hesed/api2cli plugin.
 #
-# Nothing in this repo loads .env, so export the credentials first:
+# The credentials come from Infisical: when they aren't already exported, the
+# script re-runs itself under `infisical run`, signed in either by a one-time
+# `infisical login` or, in a headless sandbox, by a machine identity's
+# INFISICAL_UNIVERSAL_AUTH_CLIENT_ID and INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET.
 #
-#   set -a; . ./.env; set +a
 #   npm run test:e2e
 #   npm run test:e2e -- --keep            # skip the post-run sweep
 #   npm run test:e2e -- --grep "comment"  # extra args go through to mocha
@@ -18,6 +20,28 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# E2E_VIA_INFISICAL stops a second re-exec when Infisical lacks a secret. The
+# absolute path matters: $0 may be relative to the directory we just left.
+if { [ -z "${LINEAR_API_KEY:-}" ] || [ -z "${VERCEL_API_KEY:-}" ] || [ -z "${CONTEXT7_API_KEY:-}" ]; } &&
+  [ -z "${E2E_VIA_INFISICAL:-}" ] && command -v infisical >/dev/null; then
+  infisical_args=(--silent)
+  if [ -n "${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:-}" ]; then
+    # The CLI reads the client id and secret from the environment; passing
+    # them as flags would put the secret in the process list.
+    INFISICAL_TOKEN="$(infisical login --method=universal-auth --silent --plain)"
+    export INFISICAL_TOKEN
+  fi
+  # A machine identity token ignores .infisical.json, so pass its project ID.
+  if [ -n "${INFISICAL_TOKEN:-}" ]; then
+    infisical_args+=(--projectId "$(node -p "require('./.infisical.json').workspaceId")")
+  fi
+  E2E_VIA_INFISICAL=1 exec infisical run "${infisical_args[@]}" -- "$PWD/scripts/e2e.sh" "$@"
+fi
+
+# The three API keys are all the tests need; keep the Infisical ones out of
+# their environment — the sdkck leg runs the plugin in-process with it.
+unset INFISICAL_TOKEN INFISICAL_UNIVERSAL_AUTH_CLIENT_ID INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET
 
 KEEP=0
 MOCHA_ARGS=()
@@ -38,7 +62,9 @@ done
 
 if [ "${#missing[@]}" -gt 0 ]; then
   echo "error: missing credentials: ${missing[*]}" >&2
-  echo "Nothing in this repo loads .env. Run:  set -a; . ./.env; set +a" >&2
+  echo "Check they exist in Infisical's dev environment and that the" >&2
+  echo "Infisical CLI is installed and logged in (infisical login), or set" >&2
+  echo "INFISICAL_UNIVERSAL_AUTH_CLIENT_ID and _CLIENT_SECRET." >&2
   exit 1
 fi
 
